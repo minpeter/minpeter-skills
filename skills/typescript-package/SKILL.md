@@ -58,14 +58,16 @@ Several related pkgs    → MONOREPO (packages/*, turbo, source-condition for in
 2. Resolve the toolchain at scaffold time: `corepack use pnpm@latest`, install
    all dev tools with `@latest`, then keep the resolved `packageManager`,
    dependency ranges, and lockfile that pnpm writes.
-3. `tsconfig.base.json` (shared strict options) + root `tsconfig.json`
+3. Add `npm-run-all` for script composition: use `run-p` for independent checks
+   or multi-process dev, and `run-s` for ordered pipelines.
+4. `tsconfig.base.json` (shared strict options) + root `tsconfig.json`
    (`noEmit`, `customConditions`) + `tsconfig.build.json` (NO custom condition).
-4. `biome.jsonc` = **just** `extends: ["ultracite/biome/core", "ultracite/biome/vitest"]`. Nothing else (§3).
-5. **tsdown** per package; `tsc --noEmit` for typecheck.
-6. Per-package `package.json`: `type: module`, `sideEffects: false`,
+5. `biome.jsonc` = **just** `extends: ["ultracite/biome/core", "ultracite/biome/vitest"]`. Nothing else (§3).
+6. **tsdown** per package; `tsc --noEmit` for typecheck.
+7. Per-package `package.json`: `type: module`, `sideEffects: false`,
    `exports` with the source-condition (§5), `publishConfig.provenance: true`.
-7. `.changeset/config.json`, `turbo.json`, `vitest.config.ts`.
-8. CI (`ci.yml`: lint → typecheck → test → build → **attw**) and
+8. `.changeset/config.json`, `turbo.json`, `vitest.config.ts`.
+9. CI (`ci.yml`: lint → typecheck → test → build → **attw**) and
    `release.yml` (Changesets + **OIDC**, §6).
 
 → **All file contents are in [`references/templates.md`](references/templates.md).** Copy them verbatim.
@@ -109,6 +111,25 @@ See [`references/templates.md`](references/templates.md) for the full list of wh
 - Default to **ESM-only** (`"type": "module"`, exports use `import`). Ship CJS
   only if you actually have CJS consumers — and then nest `types` correctly per
   branch (`.d.ts` vs `.d.cts`); see the dual template.
+
+## 4.1 Package scripts: small commands, composed at the root
+
+Use predictable script names and compose them instead of writing long shell chains.
+Recent minpeter repos use this shape:
+
+- Root monorepo commands call Turbo or whole-repo tools:
+  `build`, `dev`, `typecheck`, `test`, `check:lint`, `check`, `fix`, `changeset`,
+  `version`, `release`.
+- Per-package library commands stay minimal:
+  `build: tsdown`, `dev: tsdown --watch`, `typecheck: tsc -p tsconfig.json --noEmit`,
+  `test: vitest run`, `attw: attw --pack .`.
+- Use **`run-p`** when tasks are independent: `check:lint`, `check:typecheck`,
+  `check:test`; or app/worker dev processes like `dev:worker` + `dev:relay`.
+- Use **`run-s`** when order matters: `build` → `attw`, first-publish setup,
+  `ship:secrets` → `ship:worker` → `ship:webhook`.
+- Keep Biome at the root for package repos: no per-package `lint` script unless
+  the package is intentionally standalone. For monorepos, `check:lint` is the
+  single `ultracite check` pass.
 
 ## 5. Internal deps: the namespaced source-condition (monorepo only)
 
@@ -163,6 +184,8 @@ Step-by-step + the release workflow: **[`references/publishing-oidc.md`](referen
 ## 7. Review checklist (use when auditing an existing repo)
 
 - [ ] pnpm resolved from latest and recorded in `packageManager`; `pnpm-workspace.yaml` holds pnpm settings
+- [ ] `npm-run-all` present when scripts use `run-p`/`run-s`
+- [ ] Root `check` composes small `check:*` commands; parallel work uses `run-p`, ordered pipelines use `run-s`
 - [ ] `biome.jsonc` extends ultracite and has **zero** overrides/ignores/`biome-ignore`
 - [ ] No barrel files; public API via subpath exports
 - [ ] Build is **tsdown**; `tsc` is `--noEmit` only

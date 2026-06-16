@@ -84,7 +84,7 @@ jobs:
       - uses: changesets/action@<current-major>
         with:
           version: pnpm run version         # changeset version
-          publish: pnpm run release         # turbo run build && changeset publish
+          publish: pnpm run release         # run-s build release:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NO NPM_TOKEN / NODE_AUTH_TOKEN — npm only uses OIDC when the auth env is unset
