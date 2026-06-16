@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+.turbo/
+coverage/
+*.log
+.DS_Store
+.omx/
+.omo/
