@@ -89,6 +89,12 @@ verifyDepsBeforeRun: false
 Keep leaf commands small and give composition a name. This is the pattern to
 copy from recent minpeter repos:
 
+- Provenance for this rule: it was checked against package scripts in
+  `minpeter.v2`, `ai-sdk-tool-call-middleware`, `tezentica`,
+  `cf-chat-sdk-worker-template`, `kakao-agent`, `pss-next`, `opensearch-mcp`,
+  `oh-my-opencode`, and `bori`. New repos and wrappers should follow the modern
+  `dev` / `build` / `ship` root UX even when older apps still expose `release`
+  or top-level `deploy`.
 - Root UX is a contract:
   - `pnpm dev` starts the local dev surface.
   - `pnpm build` builds all packages/apps.

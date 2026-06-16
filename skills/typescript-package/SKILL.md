@@ -115,7 +115,11 @@ See [`references/templates.md`](references/templates.md) for the full list of wh
 ## 4.1 Package scripts: small commands, composed at the root
 
 Use predictable script names and compose them instead of writing long shell chains.
-Recent minpeter repos use this shape:
+Recent minpeter repos use this shape. This was cross-checked against current
+local package scripts from minpeter.v2, ai-sdk-tool-call-middleware,
+tezentica, cf-chat-sdk-worker-template, kakao-agent, pss-next, opensearch-mcp,
+oh-my-opencode, and bori; the reusable rule is the modern root UX, not every
+legacy script name in older apps.
 
 - Root monorepo commands call Turbo or whole-repo tools:
   `dev`, `build`, `ship`, `typecheck`, `test`, `check:lint`, `check`, `fix`,
