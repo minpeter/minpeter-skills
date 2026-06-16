@@ -180,15 +180,22 @@ verifyDepsBeforeRun: false
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsx --conditions @minpeter/source watch src/index.ts",
+    "dev": "tsdown --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "lint": "ultracite check",
     "attw": "attw --pack ."
   },
   "publishConfig": { "access": "public", "provenance": true }
 }
 ```
+
+> **No per-package `lint` script** — Biome lints the whole repo in one root pass.
+>
+> **Where `--conditions` actually matters:** a *library's* `dev` is just
+> `tsdown --watch` (rebuild on change). The source condition pays off in an **app
+> or server** that consumes workspace libraries — its dev script resolves those
+> libs to live `.ts` source with no build step:
+> `tsx --conditions=@minpeter/source watch src/main.ts`.
 
 ### Dual ESM + CJS variant (only if you have CJS consumers)
 
@@ -205,6 +212,22 @@ Nest `types` **inside each branch** with the right extension — a single shared
   }
 }
 ```
+
+> Dual builds need `format: ["esm", "cjs"]` in tsdown and a real `.d.cts` emitted
+> for the `require` branch. tsdown's separate-`.d.cts` emission isn't guaranteed by
+> a flag alone — **`attw --pack` is what proves it's correct**. If in doubt, stay ESM-only.
+
+### Exports & the no-barrel rule (be consistent with zero-ignore)
+
+The `.` root export above points at `src/index.ts`. If that file is a **pure
+re-export barrel**, ultracite's `noBarrelFile` will (correctly) flag it — and the
+zero-ignore rule means you **don't** silence it. Two clean options:
+
+- **Preferred:** drop the root `.` barrel and expose **subpath exports** that point
+  at real modules (`"./client"`, `"./server"`, …). Best for tree-shaking.
+- If you keep a root `.`, make `src/index.ts` hold **actual API code**, not only
+  `export … from`. A handful of re-exports in a tiny lib is usually fine; a
+  growing barrel is the smell the rule exists to catch.
 
 ---
 
@@ -250,15 +273,24 @@ export default defineConfig({
   "$schema": "https://turborepo.dev/schema.json",
   "globalDependencies": ["tsconfig.base.json"],
   "tasks": {
+    // build needs upstream dist: the build tsconfig has NO source condition, so
+    // .d.ts generation resolves sibling deps to their built dist.
     "build":     { "dependsOn": ["^build"], "outputs": ["dist/**"], "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts"] },
-    "typecheck": { "dependsOn": ["^build"] },
-    "test":      { "dependsOn": ["^build"], "cache": false },
+    // typecheck & test resolve internal deps to .ts SOURCE (the source condition),
+    // so they must NOT depend on ^build. ^typecheck only orders errors topologically.
+    "typecheck": { "dependsOn": ["^typecheck"] },
+    "test":      { "cache": false },
+    // attw inspects the packed dist, so it needs THIS package built first.
     "attw":      { "dependsOn": ["build"] },
-    "lint":      { "cache": false },
     "dev":       { "cache": false, "persistent": true }
   }
 }
 ```
+
+> **No `lint` task.** Biome is a single fast binary — run it once over the whole
+> repo at the root (`pnpm lint` → `ultracite check`), not per-package via turbo.
+> Per-package `lint` scripts + a turbo `lint` task are an ESLint-era pattern; with
+> Biome they're redundant and slower.
 
 ---
 

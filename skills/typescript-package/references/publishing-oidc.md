@@ -13,22 +13,41 @@ npm attaches provenance automatically.
 | `NPM_TOKEN`      | **not needed** — and must be **absent** on the publish step   |
 | Provenance       | automatic on trusted publish — **don't** pass `--provenance`  |
 
-## One-time setup on npmjs.com
+## First release (bootstrap a brand-new package)
 
-1. **First publish must use a token.** OIDC cannot create a package's *first ever*
-   version (npm/cli #8544). Do the initial `npm publish` locally/with a token, then
-   switch to OIDC for all later releases. Keep the GitHub repo + npm package public
-   for automatic provenance.
-2. npmjs.com → the package page → **Settings** (admin/owner required for scoped/org
+OIDC **cannot create a package's first-ever version** (npm/cli #8544) — the trusted
+publisher can only be configured on a package that already exists. So the very first
+release is a one-time local publish; everything after is CI/OIDC.
+
+```bash
+# 1. authenticate locally (or use a granular automation token)
+npm login
+
+# 2. build the package
+pnpm --filter <pkg> build
+
+# 3. first publish from your machine. Scoped packages MUST pass --access public.
+#    This first version will NOT have provenance (provenance needs CI + OIDC).
+cd packages/<pkg> && npm publish --access public
+```
+
+Now the package exists on npm → do the **trusted-publisher setup** below **once** →
+from then on, all releases go through CI with OIDC + provenance and **no token**.
+(npm has discussed allowing initial OIDC publishes; re-check for net-new packages,
+but as of 2026 the token-first bootstrap is still required.)
+
+## Trusted-publisher setup on npmjs.com (one-time, per package)
+
+1. npmjs.com → the package page → **Settings** (admin/owner required for scoped/org
    packages).
-3. **Trusted Publisher** section → **Connect** → choose **GitHub Actions**.
-4. Fill: **Organization or user** = GitHub owner (e.g. `minpeter`); **Repository** =
+2. **Trusted Publisher** section → **Connect** → choose **GitHub Actions**.
+3. Fill: **Organization or user** = GitHub owner (e.g. `minpeter`); **Repository** =
    repo name only (e.g. `ai-router`); **Workflow filename** = file name only incl.
    extension, e.g. `release.yml` (it's assumed to be under `.github/workflows/`);
    **Environment** = only if your job sets `environment:` — must match exactly.
-5. **Allowed actions** (shown for configs created after 2026-05-20): select at least
+4. **Allowed actions** (shown for configs created after 2026-05-20): select at least
    `npm publish`. Save.
-6. Verify after the first OIDC run: the version page shows a *Published via trusted
+5. Verify after the first OIDC run: the version page shows a *Published via trusted
    publisher* / provenance badge linking the GitHub Actions run.
 
 ## .github/workflows/release.yml
