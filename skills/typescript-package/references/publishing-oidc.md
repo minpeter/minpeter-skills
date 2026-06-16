@@ -3,15 +3,20 @@
 **Mandatory. No `NPM_TOKEN` anywhere.** Releases authenticate via GitHub OIDC and
 npm attaches provenance automatically.
 
-## Requirements (verified 2026-06)
+## Requirements
 
 | Thing            | Value                                                          |
 |------------------|---------------------------------------------------------------|
-| Node (release)   | **≥ 22.14.0** (use 24)                                        |
-| npm CLI          | **≥ 11.5.1** (`npm install -g npm@latest` if older)           |
+| Node (release)   | Use the current Node runtime recommended by npm's trusted-publishing docs |
+| npm CLI          | Install **`npm@latest`** immediately before publishing        |
 | GH permissions   | `id-token: write` (+ `contents: read`; `write` only if pushing tags/PRs) |
 | `NPM_TOKEN`      | **not needed** — and must be **absent** on the publish step   |
 | Provenance       | automatic on trusted publish — **don't** pass `--provenance`  |
+
+Resolve current GitHub Action major tags before copying the workflow
+(`actions/checkout`, `actions/setup-node`, `pnpm/action-setup`,
+`changesets/action`). Keep the workflow version-free in this guide so it does
+not age into stale action tags.
 
 ## First release (bootstrap a brand-new package)
 
@@ -33,8 +38,8 @@ cd packages/<pkg> && npm publish --access public
 
 Now the package exists on npm → do the **trusted-publisher setup** below **once** →
 from then on, all releases go through CI with OIDC + provenance and **no token**.
-(npm has discussed allowing initial OIDC publishes; re-check for net-new packages,
-but as of 2026 the token-first bootstrap is still required.)
+Re-check npm's trusted-publishing docs for net-new packages; if npm adds
+first-publish support later, follow the current docs instead of this bootstrap.
 
 ## Trusted-publisher setup on npmjs.com (one-time, per package)
 
@@ -65,20 +70,21 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@<current-major>
         with: { fetch-depth: 0 }
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@<current-major>
+      - uses: actions/setup-node@<current-major>
         with:
-          node-version: 24                 # OIDC needs Node > 22
+          node-version: current            # track npm's current trusted-publishing runtime
+          check-latest: true
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - run: npm install -g npm@latest      # trusted publishing needs npm >= 11.5.1
+      - run: npm install -g npm@latest      # keep trusted-publishing support current
       - run: pnpm install --frozen-lockfile
-      - uses: changesets/action@v1
+      - uses: changesets/action@<current-major>
         with:
           version: pnpm run version         # changeset version
-          publish: pnpm run release         # turbo run build && changeset publish
+          publish: pnpm run ship            # run-s build ship:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # NO NPM_TOKEN / NODE_AUTH_TOKEN — npm only uses OIDC when the auth env is unset
@@ -91,8 +97,9 @@ jobs:
   an earlier private-dep `pnpm install` is fine, just not on publish.)
 - `changeset publish` calls `npm publish` under the hood, so OIDC + provenance flow
   through automatically.
-- If the bundled npm is older than 11.5.1 (older Node, or pnpm-pinned), the
-  `npm install -g npm@latest` line is required.
+- Keep the `npm install -g npm@latest` line even when the selected Node runtime
+  currently bundles a compatible npm; it prevents this skill from freezing an
+  old trusted-publishing minimum.
 - Per-package `publishConfig: { "access": "public", "provenance": true }`.
 
 ## Sources

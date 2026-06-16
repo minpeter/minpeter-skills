@@ -1,15 +1,34 @@
 # Copy-paste templates
 
-All values use the latest verified versions (2026-06): pnpm `11.7.0`, tsdown
-`0.22.2`, `@biomejs/biome` `2.5.0`, `ultracite` `7.8.3`, TypeScript `6.0.3`,
-vitest `4.1.9`, turbo `2.9.18`. Pin Biome **exactly** (no `^`); caret the rest.
+Resolve versions when you scaffold. Do **not** copy stale package versions from
+this skill:
+
+```bash
+corepack enable
+corepack use pnpm@latest
+
+# Biome must be exact-pinned, but the exact value should be today's latest.
+pnpm add -DwE @biomejs/biome@latest
+
+# Let pnpm write current ranges for the rest of the toolchain.
+pnpm add -Dw @arethetypeswrong/cli@latest @changesets/cli@latest npm-run-all@latest tsdown@latest tsx@latest turbo@latest typescript@latest ultracite@latest vitest@latest
+```
+
+After that, keep the resolved `packageManager`, `devDependencies`, and lockfile
+that pnpm wrote. Biome remains exact-pinned; the rest can use pnpm's default
+range policy unless a project has a stricter release rule.
+
+For GitHub Actions examples, resolve each action's current recommended major tag
+before copying the workflow (`actions/checkout`, `actions/setup-node`,
+`pnpm/action-setup`, `changesets/action`). Do not preserve old action majors from
+this skill.
 
 ---
 
 ## pnpm-workspace.yaml
 
 ```yaml
-# pnpm 11 reads settings here (not .npmrc / package.json#pnpm)
+# Modern pnpm reads settings here (not .npmrc / package.json#pnpm)
 packages:
   - "packages/*"        # omit the whole block for a single-package repo
 
@@ -28,30 +47,89 @@ verifyDepsBeforeRun: false
   "name": "@minpeter/<repo>-monorepo",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.7.0",
-  "engines": { "node": ">=22" },
+  "packageManager": "pnpm@<resolved-latest>",
+  "engines": { "node": ">=<project-runtime>" },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "ultracite check",
-    "format": "ultracite fix",
+    "check": "run-s check:static check:package",
+    "check:static": "run-p check:lint check:typecheck check:test",
+    "check:lint": "ultracite check",
+    "check:typecheck": "pnpm typecheck",
+    "check:test": "pnpm test",
+    "check:package": "run-s build attw",
+    "lint": "pnpm check:lint",
+    "fix": "ultracite fix",
+    "format": "pnpm fix",
     "attw": "turbo run attw",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "turbo run build && changeset publish"
+    "ship": "run-s build ship:publish",
+    "ship:publish": "changeset publish"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.0",
-    "@biomejs/biome": "2.5.0",
-    "@changesets/cli": "^2.29.0",
-    "tsdown": "^0.22.2",
-    "tsx": "^4.20.0",
-    "turbo": "^2.9.18",
-    "typescript": "^6.0.3",
-    "ultracite": "^7.8.3",
-    "vitest": "^4.1.9"
+    "@arethetypeswrong/cli": "^<resolved-latest>",
+    "@biomejs/biome": "<resolved-latest-exact>",
+    "@changesets/cli": "^<resolved-latest>",
+    "npm-run-all": "^<resolved-latest>",
+    "tsdown": "^<resolved-latest>",
+    "tsx": "^<resolved-latest>",
+    "turbo": "^<resolved-latest>",
+    "typescript": "^<resolved-latest>",
+    "ultracite": "^<resolved-latest>",
+    "vitest": "^<resolved-latest>"
+  }
+}
+```
+
+### Script composition rules
+
+Keep leaf commands small and give composition a name. This is the pattern to
+copy from recent minpeter repos:
+
+- Provenance for this rule: it was checked against package scripts in
+  `minpeter.v2`, `ai-sdk-tool-call-middleware`, `tezentica`,
+  `cf-chat-sdk-worker-template`, `kakao-agent`, `pss-next`, `opensearch-mcp`,
+  `oh-my-opencode`, and `bori`. New repos and wrappers should follow the modern
+  `dev` / `build` / `ship` root UX even when older apps still expose `release`
+  or top-level `deploy`.
+- Root UX is a contract:
+  - `pnpm dev` starts the local dev surface.
+  - `pnpm build` builds all packages/apps.
+  - `pnpm ship` delivers the repo.
+  A new repo should not require users or agents to remember a bespoke wrapper
+  before these work.
+- `run-p` for independent work:
+  - `check:static`: lint, typecheck, and test can run together.
+  - `dev`: app stacks can run `dev:worker`, `dev:relay`, `dev:tunnel`, etc. at
+    the same time.
+- `run-s` for ordered work:
+  - `check`: run static checks first, then package-output checks (`build` and
+    `attw`).
+  - `ship` or app delivery flows: secrets/config first, deploy second, webhook
+    registration last.
+- Name top-level delivery **`ship`**, not `deploy`. Use `ship:*` for delivery
+  phases (`ship:secrets`, `ship:worker`, `ship:webhook`). A leaf `ship:worker`
+  may call a provider CLI command such as `wrangler deploy`; the public package
+  script remains `pnpm ship`.
+- Prefer `check:*` and `fix:*` names over long one-off shell chains. If a command
+  gets long enough to need environment branching, move it into `scripts/*.mjs`
+  and keep `package.json` as the command index.
+
+Examples for app/worker repos that need multiple dev or delivery steps:
+
+```jsonc
+{
+  "scripts": {
+    "dev": "run-p dev:worker dev:relay",
+    "dev:worker": "wrangler dev",
+    "dev:relay": "tsx scripts/relay.ts",
+    "ship": "run-s ship:secrets ship:worker ship:webhook",
+    "ship:secrets": "wrangler secret bulk .dev.vars",
+    "ship:worker": "wrangler deploy",
+    "ship:webhook": "tsx scripts/webhook.ts"
   }
 }
 ```
@@ -85,8 +163,6 @@ verifyDepsBeforeRun: false
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-
-    "ignoreDeprecations": "6.0",
 
     // Biome owns unused-symbol reporting — don't double-report from tsc
     "noUnusedLocals": false,
@@ -129,7 +205,7 @@ verifyDepsBeforeRun: false
 
 ```jsonc
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/<installed-biome-version>/schema.json",
   "extends": ["ultracite/biome/core", "ultracite/biome/vitest"]
 }
 ```
@@ -155,7 +231,7 @@ verifyDepsBeforeRun: false
 ```jsonc
 {
   "name": "@minpeter/runtime",
-  "version": "0.0.0",
+  "version": "<initial-version>",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
@@ -288,7 +364,7 @@ export default defineConfig({
 ```
 
 > **No `lint` task.** Biome is a single fast binary — run it once over the whole
-> repo at the root (`pnpm lint` → `ultracite check`), not per-package via turbo.
+> repo at the root (`pnpm check:lint` → `ultracite check`), not per-package via turbo.
 > Per-package `lint` scripts + a turbo `lint` task are an ESLint-era pattern; with
 > Biome they're redundant and slower.
 
@@ -298,7 +374,7 @@ export default defineConfig({
 
 ```json
 {
-  "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+  "$schema": "https://unpkg.com/@changesets/config@<installed-changesets-version>/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
@@ -323,16 +399,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with: { node-version: 22, cache: pnpm }
+      - uses: actions/checkout@<current-major>
+      - uses: pnpm/action-setup@<current-major>
+      - uses: actions/setup-node@<current-major>
+        with:
+          node-version: current
+          check-latest: true
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm attw        # arethetypeswrong: guards the exports/source-condition
+      - run: pnpm check       # lint + typecheck + test, then build + attw
 ```
 
 The release workflow (`release.yml`) is in
