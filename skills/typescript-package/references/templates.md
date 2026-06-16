@@ -1,15 +1,34 @@
 # Copy-paste templates
 
-All values use the latest verified versions (2026-06): pnpm `11.7.0`, tsdown
-`0.22.2`, `@biomejs/biome` `2.5.0`, `ultracite` `7.8.3`, TypeScript `6.0.3`,
-vitest `4.1.9`, turbo `2.9.18`. Pin Biome **exactly** (no `^`); caret the rest.
+Resolve versions when you scaffold. Do **not** copy stale package versions from
+this skill:
+
+```bash
+corepack enable
+corepack use pnpm@latest
+
+# Biome must be exact-pinned, but the exact value should be today's latest.
+pnpm add -DwE @biomejs/biome@latest
+
+# Let pnpm write current ranges for the rest of the toolchain.
+pnpm add -Dw @arethetypeswrong/cli@latest @changesets/cli@latest tsdown@latest tsx@latest turbo@latest typescript@latest ultracite@latest vitest@latest
+```
+
+After that, keep the resolved `packageManager`, `devDependencies`, and lockfile
+that pnpm wrote. Biome remains exact-pinned; the rest can use pnpm's default
+range policy unless a project has a stricter release rule.
+
+For GitHub Actions examples, resolve each action's current recommended major tag
+before copying the workflow (`actions/checkout`, `actions/setup-node`,
+`pnpm/action-setup`, `changesets/action`). Do not preserve old action majors from
+this skill.
 
 ---
 
 ## pnpm-workspace.yaml
 
 ```yaml
-# pnpm 11 reads settings here (not .npmrc / package.json#pnpm)
+# Modern pnpm reads settings here (not .npmrc / package.json#pnpm)
 packages:
   - "packages/*"        # omit the whole block for a single-package repo
 
@@ -28,8 +47,8 @@ verifyDepsBeforeRun: false
   "name": "@minpeter/<repo>-monorepo",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.7.0",
-  "engines": { "node": ">=22" },
+  "packageManager": "pnpm@<resolved-latest>",
+  "engines": { "node": ">=<project-runtime>" },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -43,15 +62,15 @@ verifyDepsBeforeRun: false
     "release": "turbo run build && changeset publish"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.0",
-    "@biomejs/biome": "2.5.0",
-    "@changesets/cli": "^2.29.0",
-    "tsdown": "^0.22.2",
-    "tsx": "^4.20.0",
-    "turbo": "^2.9.18",
-    "typescript": "^6.0.3",
-    "ultracite": "^7.8.3",
-    "vitest": "^4.1.9"
+    "@arethetypeswrong/cli": "^<resolved-latest>",
+    "@biomejs/biome": "<resolved-latest-exact>",
+    "@changesets/cli": "^<resolved-latest>",
+    "tsdown": "^<resolved-latest>",
+    "tsx": "^<resolved-latest>",
+    "turbo": "^<resolved-latest>",
+    "typescript": "^<resolved-latest>",
+    "ultracite": "^<resolved-latest>",
+    "vitest": "^<resolved-latest>"
   }
 }
 ```
@@ -85,8 +104,6 @@ verifyDepsBeforeRun: false
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-
-    "ignoreDeprecations": "6.0",
 
     // Biome owns unused-symbol reporting — don't double-report from tsc
     "noUnusedLocals": false,
@@ -129,7 +146,7 @@ verifyDepsBeforeRun: false
 
 ```jsonc
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/<installed-biome-version>/schema.json",
   "extends": ["ultracite/biome/core", "ultracite/biome/vitest"]
 }
 ```
@@ -155,7 +172,7 @@ verifyDepsBeforeRun: false
 ```jsonc
 {
   "name": "@minpeter/runtime",
-  "version": "0.0.0",
+  "version": "<initial-version>",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
@@ -298,7 +315,7 @@ export default defineConfig({
 
 ```json
 {
-  "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+  "$schema": "https://unpkg.com/@changesets/config@<installed-changesets-version>/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
@@ -323,10 +340,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with: { node-version: 22, cache: pnpm }
+      - uses: actions/checkout@<current-major>
+      - uses: pnpm/action-setup@<current-major>
+      - uses: actions/setup-node@<current-major>
+        with:
+          node-version: current
+          check-latest: true
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck

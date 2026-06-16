@@ -16,7 +16,6 @@ description: >-
 license: MIT
 metadata:
   author: minpeter
-  version: "1.0.0"
 ---
 
 # TypeScript package style (minpeter)
@@ -24,22 +23,22 @@ metadata:
 An opinionated, **locked** toolchain for TypeScript libraries and monorepos.
 "Locked" means: don't re-litigate these per project — they are the defaults.
 Every choice below was distilled from minpeter's own repos and then checked
-against 2026 ecosystem best practice (see the verdicts in `references/`).
+against current ecosystem best practice (see the verdicts in `references/`).
 
 ## The locked stack
 
 | Concern        | Choice (no substitutes)                                   |
 |----------------|----------------------------------------------------------|
-| Package manager| **pnpm**, latest (`11.7.0`), pinned via `packageManager` |
-| Monorepo       | pnpm workspaces + **Turborepo** (`turbo` 2.9.x)          |
-| Lint + format  | **Biome** (`2.5.0`) via **`ultracite`** — **zero ignores** (§3) |
+| Package manager| **pnpm latest**, with the resolved version recorded in `packageManager` |
+| Monorepo       | pnpm workspaces + **Turborepo latest**                   |
+| Lint + format  | **Biome latest** via **`ultracite` latest** — **zero ignores** (§3) |
 | Type-check     | **`tsc --noEmit`** only — never emit JS with tsc          |
-| Build          | **tsdown** (`0.22.x`) — **not tsup**, not raw tsc         |
+| Build          | **tsdown latest** — **not tsup**, not raw tsc             |
 | Internal deps  | **namespaced source-condition** `@minpeter/source` (§5)  |
-| Tests          | **Vitest** (`4.1.x`) + v8 coverage                        |
+| Tests          | **Vitest latest** + v8 coverage                           |
 | Versioning     | **Changesets**                                            |
 | Publish        | **npm OIDC trusted publishing**, mandatory (§6)           |
-| TS version     | **`6.0.3`** + `ignoreDeprecations: "6.0"`                 |
+| TS compiler    | **TypeScript latest stable**                              |
 | Filenames      | **kebab-case** (enforced by ultracite)                    |
 
 > If you find ESLint, Prettier, tsup, npm/yarn lockfiles, a long-lived
@@ -55,8 +54,10 @@ Several related pkgs    → MONOREPO (packages/*, turbo, source-condition for in
 ## 2. Scaffold checklist
 
 1. `pnpm-workspace.yaml` with `packages: ["packages/*"]` (omit for single pkg);
-   put pnpm-11 settings (`onlyBuiltDependencies`, `verifyDepsBeforeRun`) here, not `.npmrc`.
-2. Pin the toolchain: `"packageManager": "pnpm@11.7.0"`, `engines.node: ">=22"`.
+   put pnpm settings (`onlyBuiltDependencies`, `verifyDepsBeforeRun`) here, not `.npmrc`.
+2. Resolve the toolchain at scaffold time: `corepack use pnpm@latest`, install
+   all dev tools with `@latest`, then keep the resolved `packageManager`,
+   dependency ranges, and lockfile that pnpm writes.
 3. `tsconfig.base.json` (shared strict options) + root `tsconfig.json`
    (`noEmit`, `customConditions`) + `tsconfig.build.json` (NO custom condition).
 4. `biome.jsonc` = **just** `extends: ["ultracite/biome/core", "ultracite/biome/vitest"]`. Nothing else (§3).
@@ -75,7 +76,7 @@ The whole `biome.jsonc` is two lines of intent:
 
 ```jsonc
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/<installed-biome-version>/schema.json",
   "extends": ["ultracite/biome/core", "ultracite/biome/vitest"]
 }
 ```
@@ -111,7 +112,7 @@ See [`references/templates.md`](references/templates.md) for the full list of wh
 
 ## 5. Internal deps: the namespaced source-condition (monorepo only)
 
-**Verdict: keep it.** It's the Colin McDonnell / TypeScript-5.7-endorsed way to get
+**Verdict: keep it.** It's the Colin McDonnell / TypeScript-endorsed way to get
 zero-build "live types" across a monorepo, and unlike `publishConfig.exports` it's
 package-manager-agnostic. But it has sharp edges — wire **all four** of these or it
 silently resolves to stale `dist`:
@@ -147,7 +148,8 @@ Full rationale, the contested history, every footgun, and citations:
 attached automatically.
 
 - Release job needs `permissions: { id-token: write, contents: read }`,
-  Node **≥ 22.14**, npm **≥ 11.5.1** (`npm i -g npm@latest` if older).
+  the Node runtime currently recommended by npm's trusted-publishing docs, and
+  `npm@latest` installed immediately before publishing.
 - `changeset publish` works under OIDC; do **not** set `NODE_AUTH_TOKEN` on the
   publish step (npm only uses OIDC when the auth token env is unset).
 - `publishConfig: { "access": "public", "provenance": true }` per package.
@@ -160,14 +162,14 @@ Step-by-step + the release workflow: **[`references/publishing-oidc.md`](referen
 
 ## 7. Review checklist (use when auditing an existing repo)
 
-- [ ] pnpm pinned latest; `pnpm-workspace.yaml` holds pnpm settings
+- [ ] pnpm resolved from latest and recorded in `packageManager`; `pnpm-workspace.yaml` holds pnpm settings
 - [ ] `biome.jsonc` extends ultracite and has **zero** overrides/ignores/`biome-ignore`
 - [ ] No barrel files; public API via subpath exports
 - [ ] Build is **tsdown**; `tsc` is `--noEmit` only
 - [ ] (monorepo) source-condition wired in all 4 places; build tsconfig has none; `attw` in CI
 - [ ] `exports` order: custom condition → `types` → `import`/`require` (types nested per branch if dual)
 - [ ] `type: module`, `sideEffects: false`, `files: ["dist"]`, `publishConfig.provenance: true`
-- [ ] Release uses **OIDC** (`id-token: write`), no `NPM_TOKEN`, Node ≥22.14 / npm ≥11.5.1
+- [ ] Release uses **OIDC** (`id-token: write`), no `NPM_TOKEN`, current npm trusted-publishing runtime guidance, and `npm@latest`
 - [ ] kebab-case filenames; `interface` over `type`; no `enum`/`any`/`!`; `node:` imports
 - [ ] Vitest + v8 coverage; Changesets configured
 
