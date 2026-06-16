@@ -118,11 +118,15 @@ Use predictable script names and compose them instead of writing long shell chai
 Recent minpeter repos use this shape:
 
 - Root monorepo commands call Turbo or whole-repo tools:
-  `build`, `dev`, `typecheck`, `test`, `check:lint`, `check`, `fix`, `changeset`,
-  `version`, `release`.
+  `dev`, `build`, `ship`, `typecheck`, `test`, `check:lint`, `check`, `fix`,
+  `changeset`, `version`.
 - Per-package library commands stay minimal:
   `build: tsdown`, `dev: tsdown --watch`, `typecheck: tsc -p tsconfig.json --noEmit`,
   `test: vitest run`, `attw: attw --pack .`.
+- The root UX contract is non-negotiable:
+  - `pnpm dev` starts the local development surface for the repo.
+  - `pnpm build` builds every publishable package/app in dependency order.
+  - `pnpm ship` performs delivery. Prefer this over top-level `deploy`.
 - Use **`run-p`** when tasks are independent: `check:lint`, `check:typecheck`,
   `check:test`; or app/worker dev processes like `dev:worker` + `dev:relay`.
 - Use **`run-s`** when order matters: `build` → `attw`, first-publish setup,
@@ -185,6 +189,8 @@ Step-by-step + the release workflow: **[`references/publishing-oidc.md`](referen
 
 - [ ] pnpm resolved from latest and recorded in `packageManager`; `pnpm-workspace.yaml` holds pnpm settings
 - [ ] `npm-run-all` present when scripts use `run-p`/`run-s`
+- [ ] Root `pnpm dev`, `pnpm build`, and `pnpm ship` are the primary local/build/delivery entrypoints
+- [ ] No top-level `deploy` script; expose delivery as `ship` / `ship:*` (leaf commands may still call tools like `wrangler deploy`)
 - [ ] Root `check` composes small `check:*` commands; parallel work uses `run-p`, ordered pipelines use `run-s`
 - [ ] `biome.jsonc` extends ultracite and has **zero** overrides/ignores/`biome-ignore`
 - [ ] No barrel files; public API via subpath exports

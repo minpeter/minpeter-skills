@@ -66,8 +66,8 @@ verifyDepsBeforeRun: false
     "attw": "turbo run attw",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "run-s build release:publish",
-    "release:publish": "changeset publish"
+    "ship": "run-s build ship:publish",
+    "ship:publish": "changeset publish"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^<resolved-latest>",
@@ -89,6 +89,12 @@ verifyDepsBeforeRun: false
 Keep leaf commands small and give composition a name. This is the pattern to
 copy from recent minpeter repos:
 
+- Root UX is a contract:
+  - `pnpm dev` starts the local dev surface.
+  - `pnpm build` builds all packages/apps.
+  - `pnpm ship` delivers the repo.
+  A new repo should not require users or agents to remember a bespoke wrapper
+  before these work.
 - `run-p` for independent work:
   - `check:static`: lint, typecheck, and test can run together.
   - `dev`: app stacks can run `dev:worker`, `dev:relay`, `dev:tunnel`, etc. at
@@ -96,13 +102,17 @@ copy from recent minpeter repos:
 - `run-s` for ordered work:
   - `check`: run static checks first, then package-output checks (`build` and
     `attw`).
-  - `release` or app deploy flows: secrets/config first, deploy second, webhook
+  - `ship` or app delivery flows: secrets/config first, deploy second, webhook
     registration last.
+- Name top-level delivery **`ship`**, not `deploy`. Use `ship:*` for delivery
+  phases (`ship:secrets`, `ship:worker`, `ship:webhook`). A leaf `ship:worker`
+  may call a provider CLI command such as `wrangler deploy`; the public package
+  script remains `pnpm ship`.
 - Prefer `check:*` and `fix:*` names over long one-off shell chains. If a command
   gets long enough to need environment branching, move it into `scripts/*.mjs`
   and keep `package.json` as the command index.
 
-Examples for app/worker repos that need multiple dev or deploy steps:
+Examples for app/worker repos that need multiple dev or delivery steps:
 
 ```jsonc
 {
