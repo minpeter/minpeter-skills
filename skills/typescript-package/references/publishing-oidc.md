@@ -92,6 +92,15 @@ jobs:
 
 ## Gotchas
 
+- **Repo-level gate (easy to miss):** the workflow-level `pull-requests: write`
+  permission is necessary but **not sufficient**. The repo (or org) must also have
+  **Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to
+  create and approve pull requests"** enabled. New repos default to *read* with PR
+  creation **off**, so the first CI run that tries to open a Version Packages PR
+  fails with `403: GitHub Actions is not permitted to create or approve pull
+  requests`. Fix: enable the checkbox (or via API:
+  `gh api repos/{owner}/{repo}/actions/permissions/workflow -X PUT -F default_workflow_permissions=write -F can_approve_pull_request_reviews=true`),
+  then re-run the failed workflow.
 - **Do not** set `NODE_AUTH_TOKEN` / `NPM_TOKEN` on the publish step — npm falls
   back to token auth if it's present and OIDC won't engage. (A read-only token for
   an earlier private-dep `pnpm install` is fine, just not on publish.)

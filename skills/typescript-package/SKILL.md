@@ -150,6 +150,11 @@ attached automatically.
 - Release job needs `permissions: { id-token: write, contents: read }`,
   the Node runtime currently recommended by npm's trusted-publishing docs, and
   `npm@latest` installed immediately before publishing.
+- **Repo-level gate:** Settings → Actions → General → Workflow permissions →
+  enable **"Allow GitHub Actions to create and approve pull requests"**. New repos
+  default to read-only with PR creation off; without this, the CI run that opens
+  the Version Packages PR fails with 403 even when the workflow declares
+  `pull-requests: write`.
 - `changeset publish` works under OIDC; do **not** set `NODE_AUTH_TOKEN` on the
   publish step (npm only uses OIDC when the auth token env is unset).
 - `publishConfig: { "access": "public", "provenance": true }` per package.
