@@ -50,30 +50,39 @@ a throwaway clone named after the skill being touched:
 
 ```bash
 SKILL=<kebab-name>                      # the skill you're adding or updating
+KIND=skill                              # skill | docs | chore  (see below)
 WORK=/tmp/minpeter-skills-$SKILL
 rm -rf "$WORK"
 git clone https://github.com/minpeter/minpeter-skills.git "$WORK"
 cd "$WORK"
-git switch -c skill/$SKILL              # or docs/$SKILL for a refinement
+git switch -c "$KIND/$SKILL"
 ```
 
-Why: the clone is always current with `origin/main` (a stale working copy is how
-you end up with a conflicting README row), it isolates scratch work from whatever
-the user has open, and `rm -rf "$WORK"` is a safe reset when an attempt goes
-sideways.
+`KIND` picks both the branch prefix and the commit type, and it is driven by the
+operation:
+
+| Operation | `KIND` | Branch | Commit subject |
+|---|---|---|---|
+| New skill | `skill` | `skill/<name>` | `feat(skills): add <name>` |
+| Edit / refine | `docs` | `docs/<name>` | `docs(<name>): <what changed>` |
+| Rename / remove | `chore` | `chore/<name>` | `chore(skills): rename …` / `remove …` |
+
+Why the clone: it is always current with `origin/main` (a stale working copy is
+how you end up with a conflicting README row), it isolates scratch work from
+whatever the user has open, and `rm -rf "$WORK"` is a safe reset when an attempt
+goes sideways.
 
 Do all the work below **inside `$WORK`**, then finish with a PR:
 
 ```bash
 git add skills/$SKILL README.md skills.sh.json AGENTS.md
-git commit -m "feat(skills): add $SKILL"
-git push -u origin skill/$SKILL
+git commit -m "feat(skills): add $SKILL"    # use the subject for your KIND
+git push -u origin "$KIND/$SKILL"
 gh pr create --fill
 ```
 
-Branch prefixes: `skill/<name>` for a new skill, `docs/<name>` for editing one,
-`chore/<name>` for renames and removals. Keep the PR title under ~70 chars and
-put the detail (what the skill covers, what was verified) in the body.
+Keep the PR title under ~70 chars and put the detail (what the skill covers, what
+was verified) in the body.
 
 Opening the PR is not the end. The merged version still has to be installed on
 this machine — see §5.
@@ -153,53 +162,36 @@ gh pr merge <n> --squash --delete-branch
 ## 5. Install the merged skill on this machine
 
 **A merged PR changes nothing locally.** The installed copy lives at
-`~/.agents/skills/<name>` (global scope), is tracked in
-`~/.agents/.skill-lock.json` by source repo + folder hash, and is surfaced into
-each detected agent's directory. Until you reinstall, every agent on this machine
-keeps reading the pre-merge version.
+`~/.agents/skills/<name>` and is tracked in `~/.agents/.skill-lock.json`. Until
+you reinstall, every agent on this machine keeps reading the pre-merge version.
+
+The one thing to get right: **`add` for a skill's first install, `update`
+afterwards.** `npx skills update` only iterates over skills already present in
+`.skill-lock.json`, so running it for a brand-new skill is a silent no-op that
+looks like success.
 
 ```bash
-# refresh the local checkout of the repo
 cd <path-to-local-checkout> && git switch main && git pull
-
-# NEW skill: it is not in the lock file yet, so `update` will not see it
-npx skills add -g minpeter/minpeter-skills --skill <name> -a '*' -y
-
-# EXISTING skill: already in the lock file, so update in place
-npx skills update -g <name>
+npx skills add -g minpeter/minpeter-skills --skill <name> -a '*' -y   # NEW
+npx skills update -g <name>                                          # EXISTING
 ```
 
-`update` only refreshes skills already present in `.skill-lock.json`, so reaching
-for it after adding a brand-new skill is a silent no-op. That distinction is the
-one thing to get right here.
+Then verify by reading the installed files (not by grepping the colorized
+`skills ls` output), and drop the scratch clone. After a rename or removal, also
+`npx skills remove -g <old-name>` — the old directory and lock entry do not
+disappear on their own.
 
-Then confirm the machine actually has the new content by reading the installed
-files — not by grepping `skills ls` output, which is colorized for humans:
-
-```bash
-rg -n '^name:' ~/.agents/skills/<name>/SKILL.md
-ls ~/.agents/skills/<name>/references/   # references/ came along too
-```
-
-Finally, clean up the scratch clone: `rm -rf /tmp/minpeter-skills-<name>`.
-
-Notes:
-- `-g` installs globally (`~/.agents/skills`, shared by all projects). Drop it to
-  install into the current project's agent directory instead.
-- `-a '*'` targets every detected agent. Name specific ones (`-a pi,claude-code`)
-  to narrow it.
-- `npx skills ls -g` is the human-readable view of what is installed where.
-- If a skill was **renamed**, install the new name and
-  `npx skills remove -g <old-name>` — the old directory and lock entry do not
-  disappear on their own, and two copies means ambiguous activation.
-- If a skill was **removed**, `npx skills remove -g <name>`.
+Full step-by-step, including the install layout, the flag table, and what to check
+when a reinstall looks like it did nothing:
+[`references/maintenance.md`](references/maintenance.md) §7.
 
 ## 6. Conventions
 
 - **Commits:** conventional, scoped to the skill —
   `docs(typescript-package): add OIDC PR-creation gate gotcha`,
   `feat(skills): add minpeter-skills-maintainer`. Repo-wide changes use
-  `docs(repo):` or `chore(repo):`.
+  `docs(repo):` or `chore(repo):`. The branch prefix follows the same operation
+  (§0).
 - **One skill per PR** where practical, so review and revert stay per-skill.
 - **Clean up** `/tmp/minpeter-skills-<name>` once the PR is merged and the skill
   is reinstalled locally (§5).

@@ -7,12 +7,18 @@ in a long-lived local checkout:
 
 ```bash
 SKILL=<kebab-name>
+KIND=skill                     # skill = new | docs = edit | chore = rename/remove
 WORK=/tmp/minpeter-skills-$SKILL
 rm -rf "$WORK"
 git clone https://github.com/minpeter/minpeter-skills.git "$WORK"
 cd "$WORK"
-git switch -c skill/$SKILL     # skill/ new | docs/ edit | chore/ rename+remove
+git switch -c "$KIND/$SKILL"
 ```
+
+Set `KIND` to match the operation before running this — it drives both the branch
+prefix and the commit type used in §5. For a removal the conventional branch is
+`chore/remove-<name>`, so set `SKILL=<name>` and
+`git switch -c "chore/remove-$SKILL"` explicitly.
 
 If `gh` is authenticated you can use `gh repo clone minpeter/minpeter-skills "$WORK"`
 instead; the HTTPS URL works either way.
@@ -101,8 +107,8 @@ the bad case entirely on a case-insensitive filesystem.
 
 ```bash
 git add skills/$SKILL README.md skills.sh.json AGENTS.md
-git commit -m "feat(skills): add $SKILL"
-git push -u origin skill/$SKILL
+git commit -m "feat(skills): add $SKILL"      # subject must match KIND (§0)
+git push -u origin "$KIND/$SKILL"
 
 gh pr create \
   --title "feat(skills): add $SKILL" \
@@ -123,7 +129,9 @@ EOF
 
 Stage the specific paths rather than `git add .`. Keep the PR title under ~70
 chars. `gh pr create --fill` is fine for small refinements where the commit
-message already says everything.
+message already says everything. Match the commit type to `KIND`: `feat(skills):`
+for a new skill, `docs(<name>):` for an edit, `chore(skills):` for a rename or
+removal.
 
 **Never** push to `main` and never `git commit` in the user's own checkout of
 this repo.
@@ -204,7 +212,7 @@ the CLI fetched a ref that does not have the merge yet.
 
 ## Renaming a skill
 
-Clone as `chore/<new-name>` (§0), then:
+Clone with `KIND=chore` (§0), then:
 
 1. `git mv skills/<old> skills/<new>`
 2. Update `name:` in the moved `SKILL.md`.
@@ -219,7 +227,7 @@ breaking change: say so in the PR body, not just the commit.
 
 ## Removing a skill
 
-Clone as `chore/remove-<name>` (§0), then:
+Clone with `KIND=chore` on a `chore/remove-<name>` branch (§0), then:
 
 1. `git rm -r skills/<name>`
 2. Delete the README row.
