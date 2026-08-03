@@ -112,6 +112,11 @@ case $KIND in
   chore) SUBJECT="chore(skills): <rename|remove> $SKILL" ;;
 esac
 
+# Fill in the <…> placeholders, then let this guard prove you did.
+case $SUBJECT in
+  *"<"*) echo "refusing: unfilled placeholder in subject: $SUBJECT" >&2; return 1 2>/dev/null || exit 1 ;;
+esac
+
 git add skills/$SKILL README.md skills.sh.json AGENTS.md
 git commit -m "$SUBJECT"
 git push -u origin HEAD          # pushes the branch you are on, whatever it is named
@@ -133,10 +138,11 @@ EOF
 )"
 ```
 
-Stage the specific paths rather than `git add .`. Fill in the `<…>` placeholders in
-the `docs`/`chore` subjects before committing. Keep the PR title under ~70 chars.
-`gh pr create --fill` is fine for small refinements where the commit message
-already says everything. `git push -u origin HEAD` is deliberate: it pushes
+Stage the specific paths rather than `git add .`. The `docs`/`chore` subjects carry
+`<…>` placeholders; the guard above aborts rather than letting a literal
+`docs(<name>): <what changed>` reach a commit or PR title. Keep the PR title under
+~70 chars. `gh pr create --fill` is fine for small refinements where the commit
+message already says everything. `git push -u origin HEAD` is deliberate: it pushes
 whatever branch is checked out, so it cannot drift from the name created in §0 (a
 removal on `chore/remove-<name>` would fail against a re-derived `$KIND/$SKILL`).
 
