@@ -112,10 +112,73 @@ Stage the specific paths rather than `git add .`. Keep the PR title under ~70
 chars. `gh pr create --fill` is fine for small refinements where the commit
 message already says everything.
 
-After the PR merges: `rm -rf "$WORK"`.
-
 **Never** push to `main` and never `git commit` in the user's own checkout of
 this repo.
+
+## 6. Merge (the user's call)
+
+Leave the PR open for the user to read. Merge only when they ask:
+
+```bash
+gh pr merge <n> --squash --delete-branch
+```
+
+## 7. Install the merged skill on this machine
+
+A merged PR does not touch the local install. Layout on this machine:
+
+```
+~/.agents/skills/<name>/        # the actual installed copy (global scope)
+~/.pi/agent/skills/<name>       # symlink -> ../../../.agents/skills/<name>
+~/.claude/skills/<name>         # ...one symlink per detected agent
+~/.agents/.skill-lock.json      # source repo + skillFolderHash per skill
+```
+
+So until you reinstall, every agent keeps reading the pre-merge copy.
+
+```bash
+# 1. refresh the local checkout
+cd <path-to-local-checkout>
+git switch main && git pull
+
+# 2a. NEW skill — not in .skill-lock.json yet, so `update` cannot see it
+npx skills add -g minpeter/minpeter-skills --skill "$SKILL" -a '*' -y
+
+# 2b. EXISTING skill — already locked, update in place
+npx skills update -g "$SKILL"
+
+# 3. verify the machine has the merged content
+npx skills ls -g | rg -A1 "$SKILL"
+rg -n '^name:' "$HOME/.agents/skills/$SKILL/SKILL.md"
+ls "$HOME/.agents/skills/$SKILL/references/"
+
+# 4. drop the scratch clone
+rm -rf "$WORK"
+```
+
+`update` iterates over what is already in `.skill-lock.json`. Running it for a
+brand-new skill is a silent no-op that looks like success — use `add` for the
+first install, `update` after that.
+
+Flags worth knowing:
+
+| Flag | Effect |
+|---|---|
+| `-g` | global scope (`~/.agents/skills`, all projects). Omit for project-local. |
+| `-a '*'` | install to every detected agent. `-a pi,claude-code` to narrow. |
+| `-y` | skip prompts (needed for non-interactive runs). |
+| `--copy` | copy instead of symlinking into agent dirs. |
+
+After a **rename**: install the new name, then
+`npx skills remove -g <old-name>`. The old directory, symlinks, and lock entry
+persist otherwise, and two copies of the same guidance means ambiguous
+activation.
+
+After a **removal**: `npx skills remove -g <name>`.
+
+If the reinstall looks like it did nothing, check `skillFolderHash` for the skill
+in `~/.agents/.skill-lock.json` — an unchanged hash after a successful pull means
+the CLI fetched a ref that does not have the merge yet.
 
 ## Renaming a skill
 
@@ -126,7 +189,7 @@ Clone as `chore/<new-name>` (§0), then:
 3. Update `README.md`: both the link target and the visible cell text.
 4. Update `skills.sh.json`.
 5. `rg -n '<old>' .` and fix every remaining hit (other skills may cross-link).
-6. Re-run steps 1–4 of this runbook.
+6. Re-run steps 1–4 of this runbook, then §5–§7.
 
 Renaming breaks installs that pinned the old name via
 `npx skills add minpeter/minpeter-skills --skill <old>`, so treat it as a
@@ -141,6 +204,7 @@ Clone as `chore/remove-<name>` (§0), then:
 3. Remove the name from `skills.sh.json`. If its grouping becomes empty, delete
    the grouping — the schema requires `minItems: 1` for both `groupings` and
    `groupings[].skills`, so an empty array makes the file invalid.
+4. After the PR merges: `npx skills remove -g <name>` (§7).
 
 ## skills.sh.json shape
 
@@ -166,7 +230,7 @@ A skill absent from every grouping still appears on the repo page (placed per
 
 ## Verifying activation end to end
 
-To sanity-check a skill the way a consumer gets it:
+To sanity-check a skill the way a consumer gets it, **before** the PR merges:
 
 ```bash
 # install the branch under review into a scratch project

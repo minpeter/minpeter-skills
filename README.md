@@ -30,7 +30,7 @@ You can also drop a skill folder straight into `.claude/skills/` (Claude Code),
 | Skill | What it does | When to use |
 |-------|--------------|-------------|
 | [`typescript-package`](skills/typescript-package/SKILL.md) | minpeter's house style for TS packages & monorepos: pnpm (latest) + Turborepo + Changesets + Biome-via-ultracite (zero ignores) + tsdown + Vitest, `tsc --noEmit` typecheck, the namespaced source-condition for zero-build internal deps, and mandatory npm OIDC trusted publishing. | Scaffolding a new TS library/monorepo, adding a workspace package, or reviewing `package.json` / `tsconfig` / `biome` / `turbo` / CI for consistency. |
-| [`minpeter-skills-maintainer`](skills/minpeter-skills-maintainer/SKILL.md) | How to maintain this repo: work from a `/tmp/minpeter-skills-<name>` clone and open a PR, scaffold with `npx skills init`, frontmatter + naming rules, progressive disclosure into `references/`, and keeping `SKILL.md` / `README.md` / `skills.sh.json` in sync. | Adding, editing, renaming, or removing a skill here, or fixing index/grouping drift. |
+| [`minpeter-skills-maintainer`](skills/minpeter-skills-maintainer/SKILL.md) | How to maintain this repo: work from a `/tmp/minpeter-skills-<name>` clone and open a PR, reinstall the skill locally after merge, scaffold with `npx skills init`, frontmatter + naming rules, progressive disclosure into `references/`, and keeping `SKILL.md` / `README.md` / `skills.sh.json` in sync. | Adding, editing, renaming, or removing a skill here, or fixing index/grouping drift. |
 
 Each skill keeps `SKILL.md` short and links out to `references/` for the heavy
 detail (copy-paste templates, deep-dives) — Vercel's recommended progressive-disclosure pattern.
