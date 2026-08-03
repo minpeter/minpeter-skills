@@ -197,13 +197,14 @@ rg -n -i --glob "$META" 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9
 
 # emails that are not example.com, and machine-local paths
 rg -n --glob "$META" '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
-rg -n --glob "$META" '/home/[a-z]|/Users/[a-z]|C:\\Users\\[A-Za-z0-9]' skills/
+rg -n --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
 ```
 
-Each must come back empty. The path pattern requires a real path character after
-the base (`/home/[a-z]`, `Users\\[A-Za-z0-9]`) so that documenting a placeholder
-like `/home/<user>/…` or `C:\Users\…` does not trip it — a guardrail that fires on
-its own examples gets ignored. Private-IP and internal-hostname patterns are in
+Each must come back empty. All three bases use the same `[A-Za-z0-9]` class so a
+real path is caught whatever the username's case (`/home/Alice`, `C:\Users\Bob`)
+while a documented placeholder passes — `<` and `…` are not alphanumeric, so
+`/home/<user>/…` and `C:\Users\…` do not trip it. A guardrail that fires on its own
+examples gets ignored. Private-IP and internal-hostname patterns are in
 [`references/maintenance.md`](references/maintenance.md) §4b.
 
 **If a secret does land on `main`:** treat it as compromised and rotate it
