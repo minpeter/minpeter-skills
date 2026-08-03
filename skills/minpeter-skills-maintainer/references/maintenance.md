@@ -94,7 +94,7 @@ find skills -mindepth 3 -name SKILL.md             # must print nothing: flat la
 # no machine-local paths, no pinned tool versions.
 # Exclude this skill: it documents both patterns, so it self-matches.
 META="!**/minpeter-skills-maintainer/**"
-rg -n --glob "$META" '/home/|/Users/|C:\\' skills/
+rg -n --glob "$META" '/home/[a-z]|/Users/[a-z]|C:\\Users\\[A-Za-z0-9]' skills/
 rg -n --glob "$META" '@[0-9]+\.[0-9]+\.[0-9]+' skills/
 ```
 
@@ -108,22 +108,35 @@ The repo is public and history is permanent, so this runs before every commit
 (SKILL.md §4 has the full rule and the placeholder conventions):
 
 ```bash
+# This skill spells out the shapes it forbids, so exclude it or every scan
+# below reports its own documentation.
+META="!**/minpeter-skills-maintainer/**"
+
 # credential shapes — must print nothing
-rg -n -i 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
+rg -n -i --glob "$META" 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
 
 # real emails (example.com/.org are the allowed placeholders)
-rg -n '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
+rg -n --glob "$META" '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
 
-# machine-local paths, private IPs, connection strings
-rg -n '/home/[a-z]|/Users/[a-z]|C:\\Users' skills/
-rg -n '\b(10|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]+\.[0-9]+\b' skills/
-rg -n -i '(postgres|mysql|mongodb|redis)://|\.internal\b|\.corp\b|\.local\b' skills/
+# machine-local paths, private IPs, connection strings and internal hostnames
+rg -n --glob "$META" '/home/[a-z]|/Users/[a-z]|C:\\Users\\[A-Za-z0-9]' skills/
+rg -n --glob "$META" '\b(10|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]+\.[0-9]+\b' skills/
+rg -n -i --glob "$META" '(postgres|mysql|mongodb|redis)://|\.internal\b|\.corp\b|\.local\b' skills/
 ```
 
-Each of these must come back empty (the maintainer skill itself documents the
-patterns, so exclude it with `--glob '!**/minpeter-skills-maintainer/**'` if it
-self-matches). A hit is not automatically a leak — read it and decide — but it is
-always worth a look before the commit lands.
+All five must come back empty. Two details make that achievable:
+
+- The path pattern requires a real path character after the base
+  (`/home/[a-z]`, `Users\\[A-Za-z0-9]`) so documenting a placeholder like
+  `/home/<user>/…` or `C:\Users\…` does not trip it.
+- `$META` excludes this skill, which necessarily contains the literal patterns it
+  forbids. Without it the scans flag their own source and get ignored — a
+  guardrail that always fires is a guardrail nobody reads.
+
+When auditing **only** this skill, read it instead of grepping it.
+
+A hit elsewhere is not automatically a leak — read it and decide — but it is always
+worth a look before the commit lands.
 
 If something secret already reached `main`: rotate it, tell the user, and do not
 rewrite history on your own.

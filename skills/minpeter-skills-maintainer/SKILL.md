@@ -186,16 +186,25 @@ When a skill documents a real service, name only what is already public (the npm
 registry, `github.com`, a published package name). The test: *would this line be
 fine in a blog post?* If not, it does not belong in a skill.
 
-Scan before every commit:
+Scan before every commit (`$META` skips this skill, which necessarily spells out
+the shapes it forbids):
 
 ```bash
+META="!**/minpeter-skills-maintainer/**"
+
 # credential shapes
-rg -n -i 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
+rg -n -i --glob "$META" 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
 
 # emails that are not example.com, and machine-local paths
-rg -n '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
-rg -n '/home/[a-z]|/Users/[a-z]|C:\\Users' skills/
+rg -n --glob "$META" '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
+rg -n --glob "$META" '/home/[a-z]|/Users/[a-z]|C:\\Users\\[A-Za-z0-9]' skills/
 ```
+
+Each must come back empty. The path pattern requires a real path character after
+the base (`/home/[a-z]`, `Users\\[A-Za-z0-9]`) so that documenting a placeholder
+like `/home/<user>/…` or `C:\Users\…` does not trip it — a guardrail that fires on
+its own examples gets ignored. Private-IP and internal-hostname patterns are in
+[`references/maintenance.md`](references/maintenance.md) §4b.
 
 **If a secret does land on `main`:** treat it as compromised and rotate it
 immediately. Removing the line in a follow-up commit is not enough — the value
