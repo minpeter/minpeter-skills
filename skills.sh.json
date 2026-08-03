@@ -6,6 +6,11 @@
       "title": "TypeScript",
       "description": "minpeter's opinionated TypeScript packaging conventions.",
       "skills": ["typescript-package"]
+    },
+    {
+      "title": "Meta",
+      "description": "Skills for maintaining this collection itself.",
+      "skills": ["minpeter-skills-maintainer"]
     }
   ]
 }
