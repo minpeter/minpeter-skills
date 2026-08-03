@@ -102,6 +102,32 @@ rg -n --glob "$META" '@[0-9]+\.[0-9]+\.[0-9]+' skills/
 exits non-zero when it matches nothing, which trips up `&&` chains, and it misses
 the bad case entirely on a case-insensitive filesystem.
 
+## 4b. Scan for secrets and personal data
+
+The repo is public and history is permanent, so this runs before every commit
+(SKILL.md §4 has the full rule and the placeholder conventions):
+
+```bash
+# credential shapes — must print nothing
+rg -n -i 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
+
+# real emails (example.com/.org are the allowed placeholders)
+rg -n '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
+
+# machine-local paths, private IPs, connection strings
+rg -n '/home/[a-z]|/Users/[a-z]|C:\\Users' skills/
+rg -n '\b(10|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]+\.[0-9]+\b' skills/
+rg -n -i '(postgres|mysql|mongodb|redis)://|\.internal\b|\.corp\b|\.local\b' skills/
+```
+
+Each of these must come back empty (the maintainer skill itself documents the
+patterns, so exclude it with `--glob '!**/minpeter-skills-maintainer/**'` if it
+self-matches). A hit is not automatically a leak — read it and decide — but it is
+always worth a look before the commit lands.
+
+If something secret already reached `main`: rotate it, tell the user, and do not
+rewrite history on your own.
+
 ## 5. Commit, push, and open the PR
 
 ```bash
@@ -134,6 +160,7 @@ gh pr create \
 ## Verified
 - `npx skills add . --list` parses the skill
 - name matches directory, all references/ links resolve, no orphans
+- no secrets, real emails, private hosts, or machine-local paths
 EOF
 )"
 ```

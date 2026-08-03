@@ -94,3 +94,26 @@ reference files are never loaded, so they are pure maintenance cost.
 
 Use relative links only. An absolute or machine-local path breaks the moment the
 skill is installed into another agent's directory.
+
+## Writing examples that are safe to publish
+
+This repo is public, so every example you write is published. Keep sample values
+obviously fake and generic:
+
+| Instead of | Write |
+|---|---|
+| a real email | `you@example.com` |
+| a company hostname or internal URL | `<registry-host>`, `https://example.com` |
+| `/home/<user>/projects/thing` | `<path-to-checkout>` or `$HOME/…` |
+| a real token, even expired | `<token>`, or omit it entirely |
+| an internal package or service name | `@your-org/<pkg>`, `<service>` |
+| a private IP or connection string | `<host>`, `<database-url>` |
+
+`example.com` and `example.org` are reserved by RFC 2606 for documentation, so
+they can never collide with a real host.
+
+Name real services only when they are already public and relevant — the npm
+registry, `github.com`, a published package. The check before committing: *would
+this line be fine in a blog post?*
+
+See SKILL.md §4 for the full no-secrets rule and the pre-commit scan.

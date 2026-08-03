@@ -176,7 +176,7 @@ verifyDepsBeforeRun: false
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
-  "author": "minpeter <minpeter@vooy.com>",
+  "author": "minpeter <you@example.com>",
   "repository": { "type": "git", "url": "git+https://github.com/minpeter/<repo>.git" },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
