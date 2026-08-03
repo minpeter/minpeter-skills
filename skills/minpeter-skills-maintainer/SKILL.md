@@ -51,21 +51,22 @@ a throwaway clone named after the skill being touched:
 ```bash
 SKILL=<kebab-name>                      # the skill you're adding or updating
 KIND=skill                              # skill | docs | chore  (see below)
+BRANCH=$KIND/$SKILL                     # removals: BRANCH=chore/remove-$SKILL
 WORK=/tmp/minpeter-skills-$SKILL
 rm -rf "$WORK"
 git clone https://github.com/minpeter/minpeter-skills.git "$WORK"
 cd "$WORK"
-git switch -c "$KIND/$SKILL"
+git switch -c "$BRANCH"
 ```
 
-`KIND` picks both the branch prefix and the commit type, and it is driven by the
-operation:
+`KIND` picks the branch prefix and the commit type, driven by the operation:
 
 | Operation | `KIND` | Branch | Commit subject |
 |---|---|---|---|
 | New skill | `skill` | `skill/<name>` | `feat(skills): add <name>` |
 | Edit / refine | `docs` | `docs/<name>` | `docs(<name>): <what changed>` |
-| Rename / remove | `chore` | `chore/<name>` | `chore(skills): rename …` / `remove …` |
+| Rename | `chore` | `chore/<name>` | `chore(skills): rename …` |
+| Remove | `chore` | `chore/remove-<name>` | `chore(skills): remove …` |
 
 Why the clone: it is always current with `origin/main` (a stale working copy is
 how you end up with a conflicting README row), it isolates scratch work from
@@ -75,14 +76,16 @@ goes sideways.
 Do all the work below **inside `$WORK`**, then finish with a PR:
 
 ```bash
+SUBJECT="feat(skills): add $SKILL"      # use the subject for your KIND
 git add skills/$SKILL README.md skills.sh.json AGENTS.md
-git commit -m "feat(skills): add $SKILL"    # use the subject for your KIND
-git push -u origin "$KIND/$SKILL"
+git commit -m "$SUBJECT"
+git push -u origin HEAD                 # pushes the checked-out branch by name
 gh pr create --fill
 ```
 
-Keep the PR title under ~70 chars and put the detail (what the skill covers, what
-was verified) in the body.
+Push `HEAD` rather than a re-derived `$KIND/$SKILL` so the pushed name always
+matches the branch you created — they differ for removals. Keep the PR title under
+~70 chars and put the detail (what the skill covers, what was verified) in the body.
 
 Opening the PR is not the end. The merged version still has to be installed on
 this machine — see §5.

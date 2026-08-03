@@ -8,17 +8,16 @@ in a long-lived local checkout:
 ```bash
 SKILL=<kebab-name>
 KIND=skill                     # skill = new | docs = edit | chore = rename/remove
+BRANCH=$KIND/$SKILL            # removals: BRANCH=chore/remove-$SKILL
 WORK=/tmp/minpeter-skills-$SKILL
 rm -rf "$WORK"
 git clone https://github.com/minpeter/minpeter-skills.git "$WORK"
 cd "$WORK"
-git switch -c "$KIND/$SKILL"
+git switch -c "$BRANCH"
 ```
 
-Set `KIND` to match the operation before running this — it drives both the branch
-prefix and the commit type used in §5. For a removal the conventional branch is
-`chore/remove-<name>`, so set `SKILL=<name>` and
-`git switch -c "chore/remove-$SKILL"` explicitly.
+`KIND` drives the commit type used in §5; `BRANCH` is what you actually push, so
+set it once here and never re-derive it later.
 
 If `gh` is authenticated you can use `gh repo clone minpeter/minpeter-skills "$WORK"`
 instead; the HTTPS URL works either way.
@@ -106,12 +105,15 @@ the bad case entirely on a case-insensitive filesystem.
 ## 5. Commit, push, and open the PR
 
 ```bash
+# SUBJECT must match KIND (§0): feat(skills): add … | docs(<name>): … | chore(skills): …
+SUBJECT="feat(skills): add $SKILL"
+
 git add skills/$SKILL README.md skills.sh.json AGENTS.md
-git commit -m "feat(skills): add $SKILL"      # subject must match KIND (§0)
-git push -u origin "$KIND/$SKILL"
+git commit -m "$SUBJECT"
+git push -u origin HEAD          # pushes the branch you are on, whatever it is named
 
 gh pr create \
-  --title "feat(skills): add $SKILL" \
+  --title "$SUBJECT" \
   --body "$(cat <<'EOF'
 ## Summary
 <what the skill covers, and why it exists>
@@ -129,9 +131,10 @@ EOF
 
 Stage the specific paths rather than `git add .`. Keep the PR title under ~70
 chars. `gh pr create --fill` is fine for small refinements where the commit
-message already says everything. Match the commit type to `KIND`: `feat(skills):`
-for a new skill, `docs(<name>):` for an edit, `chore(skills):` for a rename or
-removal.
+message already says everything. `git push -u origin HEAD` is deliberate: it
+pushes whatever branch is checked out, so it cannot drift from the name created in
+§0 (a removal on `chore/remove-<name>` would fail against a re-derived
+`$KIND/$SKILL`).
 
 **Never** push to `main` and never `git commit` in the user's own checkout of
 this repo.
@@ -227,7 +230,7 @@ breaking change: say so in the PR body, not just the commit.
 
 ## Removing a skill
 
-Clone with `KIND=chore` on a `chore/remove-<name>` branch (§0), then:
+Clone with `KIND=chore` and `BRANCH=chore/remove-$SKILL` (§0), then:
 
 1. `git rm -r skills/<name>`
 2. Delete the README row.
