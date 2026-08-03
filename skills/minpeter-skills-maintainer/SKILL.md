@@ -12,6 +12,9 @@ description: >-
   never edit a local checkout in place, never commit to main), scaffolding with
   `npx skills init`, frontmatter and naming rules, the three files that must stay
   in sync, progressive disclosure limits, and the pre-commit verification pass.
+  Everything here is published to a PUBLIC repo, so it also enforces the
+  no-secrets / no-PII rule: no tokens, credentials, private hostnames, internal
+  URLs, real emails, or machine-local paths in a skill — use placeholders.
   Authoring guidance for descriptions and skill bodies is in
   references/authoring.md; the clone / verify / PR / post-merge-install runbook
   is in references/maintenance.md.
@@ -26,6 +29,10 @@ This repo is a **skill collection**, not an app. There is no build, no test
 runner, and no package.json. The "product" is a set of Markdown files that other
 agents load, so correctness means: valid frontmatter, discoverable descriptions,
 and three files that agree with each other.
+
+**This repo is public.** Everything committed here is world-readable forever, and
+git history keeps it even after a later deletion. Treat every skill as a published
+document — see §4.
 
 ## Repo shape
 
@@ -88,7 +95,7 @@ matches the branch you created — they differ for removals. Keep the PR title u
 ~70 chars and put the detail (what the skill covers, what was verified) in the body.
 
 Opening the PR is not the end. The merged version still has to be installed on
-this machine — see §5.
+this machine — see §6.
 
 ## 1. Adding a skill
 
@@ -111,7 +118,7 @@ this machine — see §5.
 5. **Sync `skills.sh.json`** — add `<name>` to the right `groupings[].skills`,
    or add a new grouping (`title` + `description` + `skills`) if none fits.
 6. **Verify** (§3), then commit, push the branch, and open the PR (§0).
-   Once it is merged, install it locally (§5).
+   Once it is merged, install it locally (§6).
 
 ## 2. Editing an existing skill
 
@@ -127,7 +134,7 @@ link, and both break silently.
   reference file is dead weight the agent never loads.
 - Removing a skill: delete the directory, the README row, and the
   `skills.sh.json` entry (drop the grouping entirely if it goes empty —
-  `skills` requires `minItems: 1`). After merge, uninstall it locally too (§5).
+  `skills` requires `minItems: 1`). After merge, uninstall it locally too (§6).
 
 ## 3. Verify before committing
 
@@ -146,11 +153,66 @@ Then confirm by hand:
       `jq -r '.groupings[].skills[]' skills.sh.json`, not a bare grep — a plain
       quoted-string grep also matches the JSON keys)
 - [ ] no absolute paths or machine-local paths anywhere in the skill
+- [ ] nothing secret or personal (§4) — run the scan before every commit
 
 Full procedure, including the link-check and drift-check one-liners:
 [`references/maintenance.md`](references/maintenance.md).
 
-## 4. Review and merge
+## 4. Never commit secrets or personal data
+
+This repo is **public**, and `git` history is effectively permanent — deleting a
+line in a later commit does not unpublish it. A skill is a published document, so
+write it for a stranger reading it on GitHub.
+
+**Never commit:**
+- Tokens, API keys, or credentials of any kind — including expired or
+  "throwaway" ones. `NPM_TOKEN`, `gh[pousr]_…`, `sk-…`, `AKIA…`, Bearer
+  headers, `.npmrc` auth lines, private keys.
+- Real emails, phone numbers, or names of people other than the repo owner.
+- Internal or private infrastructure: company hostnames, VPN or intranet URLs,
+  private registry endpoints, internal package names, IP addresses, database
+  connection strings, S3 bucket names, ticket URLs.
+- Machine-local paths (`/home/<user>/…`, `/Users/…`, `C:\Users\…`) — both a
+  privacy leak and a portability break.
+- Real log output, stack traces, or command transcripts pasted from a work
+  machine. Sanitize them or rewrite them as generic examples.
+- Anything under NDA, or unreleased/internal product detail.
+
+**Use placeholders instead**, and make them obviously fake:
+`<your-org>`, `<repo>`, `you@example.com`, `<registry-host>`, `<path-to-checkout>`,
+`$HOME`. `example.com` / `example.org` are reserved for exactly this.
+
+When a skill documents a real service, name only what is already public (the npm
+registry, `github.com`, a published package name). The test: *would this line be
+fine in a blog post?* If not, it does not belong in a skill.
+
+Scan before every commit (`$META` skips this skill, which necessarily spells out
+the shapes it forbids):
+
+```bash
+META="!**/minpeter-skills-maintainer/**"
+
+# credential shapes
+rg -n -i --glob "$META" 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
+
+# emails that are not example.com, and machine-local paths
+rg -n --glob "$META" '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
+rg -n -i --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
+```
+
+Each must come back empty. The path scan runs case-insensitively (`-i`) with one
+`[A-Za-z0-9]` class for all three bases, so a real path is caught however it was
+written — `/home/Alice`, `/users/admin`, `c:\users\bob` — while a documented
+placeholder passes, since `<` and `…` are not alphanumeric in any case. A guardrail
+that fires on its own examples gets ignored. Private-IP and internal-hostname
+patterns are in [`references/maintenance.md`](references/maintenance.md) §4b.
+
+**If a secret does land on `main`:** treat it as compromised and rotate it
+immediately. Removing the line in a follow-up commit is not enough — the value
+stays in history and in anyone's existing clone. Tell the user; do not attempt a
+history rewrite (`filter-repo`, force-push) on your own.
+
+## 5. Review and merge
 
 The PR is for the user to read. Do not merge it yourself unless they ask —
 merging is their call, and the skill body is exactly the kind of thing that wants
@@ -162,7 +224,7 @@ When they do ask:
 gh pr merge <n> --squash --delete-branch
 ```
 
-## 5. Install the merged skill on this machine
+## 6. Install the merged skill on this machine
 
 **A merged PR changes nothing locally.** The installed copy lives at
 `~/.agents/skills/<name>` and is tracked in `~/.agents/.skill-lock.json`. Until
@@ -188,7 +250,7 @@ Full step-by-step, including the install layout, the flag table, and what to che
 when a reinstall looks like it did nothing:
 [`references/maintenance.md`](references/maintenance.md) §7.
 
-## 6. Conventions
+## 7. Conventions
 
 - **Commits:** conventional, scoped to the skill —
   `docs(typescript-package): add OIDC PR-creation gate gotcha`,
@@ -197,7 +259,7 @@ when a reinstall looks like it did nothing:
   (§0).
 - **One skill per PR** where practical, so review and revert stay per-skill.
 - **Clean up** `/tmp/minpeter-skills-<name>` once the PR is merged and the skill
-  is reinstalled locally (§5).
+  is reinstalled locally (§6).
 - **Voice:** these skills are *opinionated house style*. State the decision,
   then the reasoning. Mark hard rules as hard rules and list what to flag in
   review. Avoid hedging — a skill that says "consider maybe" gives the reading
@@ -216,4 +278,6 @@ Nested skill directories (`skills/a/b/SKILL.md`) · lowercase `skill.md` ·
 1000-line `SKILL.md` with no `references/` · pinned tool versions ·
 `references/` files nothing links to · commits pushed straight to `main` ·
 edits made in a long-lived local checkout instead of a fresh `/tmp` clone ·
-stopping at the merged PR and leaving the machine on the stale installed copy.
+stopping at the merged PR and leaving the machine on the stale installed copy ·
+real emails, tokens, private hostnames, internal URLs, or `/home/<user>/` paths
+where a placeholder belongs.

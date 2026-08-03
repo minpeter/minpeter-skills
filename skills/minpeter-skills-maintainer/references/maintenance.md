@@ -94,13 +94,55 @@ find skills -mindepth 3 -name SKILL.md             # must print nothing: flat la
 # no machine-local paths, no pinned tool versions.
 # Exclude this skill: it documents both patterns, so it self-matches.
 META="!**/minpeter-skills-maintainer/**"
-rg -n --glob "$META" '/home/|/Users/|C:\\' skills/
+rg -n -i --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
 rg -n --glob "$META" '@[0-9]+\.[0-9]+\.[0-9]+' skills/
 ```
 
 `find ... ! -name` is used instead of `ls skills/*/skill.md` because the glob
 exits non-zero when it matches nothing, which trips up `&&` chains, and it misses
 the bad case entirely on a case-insensitive filesystem.
+
+## 4b. Scan for secrets and personal data
+
+The repo is public and history is permanent, so this runs before every commit
+(SKILL.md §4 has the full rule and the placeholder conventions):
+
+```bash
+# This skill spells out the shapes it forbids, so exclude it or every scan
+# below reports its own documentation.
+META="!**/minpeter-skills-maintainer/**"
+
+# credential shapes — must print nothing
+rg -n -i --glob "$META" 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|Bearer [A-Za-z0-9._-]{20,}' skills/
+
+# real emails (example.com/.org are the allowed placeholders)
+rg -n --glob "$META" '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
+
+# machine-local paths, private IPs, connection strings and internal hostnames
+rg -n -i --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
+rg -n --glob "$META" '\b(10|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]+\.[0-9]+\b' skills/
+rg -n -i --glob "$META" '(postgres|mysql|mongodb|redis)://|\.internal\b|\.corp\b|\.local\b' skills/
+```
+
+All five must come back empty. Two details make that achievable:
+
+- The path scan runs case-insensitively (`-i`) with one `[A-Za-z0-9]` class for
+  all three bases, so a real path is caught however it was written —
+  `/home/Alice`, `/users/admin`, `c:\users\bob` (NTFS and APFS are
+  case-insensitive, so lowercase variants show up in real transcripts). A
+  documented placeholder still passes: `<` and `…` are not alphanumeric in any
+  case, so `/home/<user>/…` and `C:\Users\…` do not trip it.
+- `$META` excludes this skill, which necessarily contains the literal patterns it
+  forbids. Without it the scans flag their own source and get ignored — a
+  guardrail that always fires is a guardrail nobody reads.
+
+When auditing **only** this skill, read it instead of grepping it.
+
+A hit elsewhere is not automatically a leak — read it and decide — but it is always
+worth a look before the commit lands.
+
+If something secret already reached `main`: rotate it, tell the user, and do not
+rewrite history on your own.
 
 ## 5. Commit, push, and open the PR
 
@@ -134,6 +176,7 @@ gh pr create \
 ## Verified
 - `npx skills add . --list` parses the skill
 - name matches directory, all references/ links resolve, no orphans
+- no secrets, real emails, private hosts, or machine-local paths
 EOF
 )"
 ```
