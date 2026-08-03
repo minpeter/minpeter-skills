@@ -94,7 +94,7 @@ find skills -mindepth 3 -name SKILL.md             # must print nothing: flat la
 # no machine-local paths, no pinned tool versions.
 # Exclude this skill: it documents both patterns, so it self-matches.
 META="!**/minpeter-skills-maintainer/**"
-rg -n --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
+rg -n -i --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
 rg -n --glob "$META" '@[0-9]+\.[0-9]+\.[0-9]+' skills/
 ```
 
@@ -119,17 +119,19 @@ rg -n -i --glob "$META" 'gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9
 rg -n --glob "$META" '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' skills/ | rg -v 'example\.(com|org)'
 
 # machine-local paths, private IPs, connection strings and internal hostnames
-rg -n --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
+rg -n -i --glob "$META" '/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9]' skills/
 rg -n --glob "$META" '\b(10|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]+\.[0-9]+\b' skills/
 rg -n -i --glob "$META" '(postgres|mysql|mongodb|redis)://|\.internal\b|\.corp\b|\.local\b' skills/
 ```
 
 All five must come back empty. Two details make that achievable:
 
-- The path pattern uses one `[A-Za-z0-9]` class for all three bases, so a real
-  path is caught whatever the username's case (`/home/Alice`, `/Users/Admin`,
-  `C:\Users\Bob`) while a documented placeholder passes — `<` and `…` are not
-  alphanumeric, so `/home/<user>/…` and `C:\Users\…` do not trip it.
+- The path scan runs case-insensitively (`-i`) with one `[A-Za-z0-9]` class for
+  all three bases, so a real path is caught however it was written —
+  `/home/Alice`, `/users/admin`, `c:\users\bob` (NTFS and APFS are
+  case-insensitive, so lowercase variants show up in real transcripts). A
+  documented placeholder still passes: `<` and `…` are not alphanumeric in any
+  case, so `/home/<user>/…` and `C:\Users\…` do not trip it.
 - `$META` excludes this skill, which necessarily contains the literal patterns it
   forbids. Without it the scans flag their own source and get ignored — a
   guardrail that always fires is a guardrail nobody reads.
