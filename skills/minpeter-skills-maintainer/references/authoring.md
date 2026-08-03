@@ -27,6 +27,18 @@ The description is loaded into an agent's context *before* the body. It is the
 only signal used to decide whether to open the file. So it is not a summary —
 it is a matcher.
 
+**Hard limit: 1024 characters.** The Agent Skills spec caps it there, and
+harnesses enforce it — `pi` prints a `[Skill conflicts] … description exceeds
+1024 characters` warning on every start (it still loads the skill, but other
+harnesses may truncate). YAML folding does not help: a `>-` block scalar is
+joined into one line, so what counts is the joined length, not the line count.
+Aim for **≤ 950** so a later edit does not push it over. Check with the script in
+SKILL.md §3.
+
+When you hit the ceiling, cut in this order: adjective and hedge words, then
+restated triggers, then the least distinctive keywords. Keep the `references/`
+map and the strongest trigger phrases — those are what earn the activation.
+
 Include, in roughly this order:
 
 1. **What the skill governs**, in the user's vocabulary, not yours.
@@ -43,6 +55,9 @@ Anti-patterns:
   so the skill never fires at the right moment.
 - Sales copy ("the best way to...") — spends tokens without adding a match.
 - Over-broad scope ("all things frontend") — fires constantly and gets ignored.
+- Over 1024 characters — a per-start warning in `pi`, and truncation risk
+  elsewhere. Length is not thoroughness; a 1200-char description that gets cut
+  matches worse than a tight 900-char one.
 
 Use a YAML block scalar (`>-`) for anything longer than one line. Plain
 multi-line strings with colons in them are a common parse break.

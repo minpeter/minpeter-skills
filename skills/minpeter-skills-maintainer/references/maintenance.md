@@ -82,6 +82,35 @@ for f in skills/*/references/*; do
 done
 ```
 
+## 3b. Check description length
+
+The spec caps `description` at 1024 characters and harnesses enforce it — `pi`
+prints `[Skill conflicts] … description exceeds 1024 characters` on every start
+for each offender. It still loads the skill, so this never fails loudly at author
+time; it just nags the user forever. Run the check instead:
+
+```bash
+python3 - <<'EOF'
+import re, sys, pathlib
+bad = 0
+for p in sorted(pathlib.Path('skills').glob('*/SKILL.md')):
+    fm = p.read_text().split('---')[1]
+    m = re.search(r'^description: >-\n((?:  .*\n)+)', fm, re.M)
+    if not m:
+        print(f"    ????  {p.parent.name}: description is not a '>-' block")
+        bad = 1
+        continue
+    n = len(' '.join(l.strip() for l in m.group(1).strip().split('\n')))
+    print(f"{n:5d}  {'OVER' if n > 1024 else 'ok':4}  {p.parent.name}")
+    bad |= n > 1024
+sys.exit(bad)
+EOF
+```
+
+It measures the **folded** string, which is what the harness sees: a `>-` block
+scalar joins its lines with single spaces, so line count and per-line width are
+irrelevant. Target ≤ 950 to leave headroom for later edits.
+
 ## 4. Check size and hygiene
 
 ```bash
