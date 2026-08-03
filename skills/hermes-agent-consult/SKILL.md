@@ -1,22 +1,19 @@
 ---
 name: hermes-agent-consult
 description: >-
-  How to consult the local `hermes` agent as the long-term-memory oracle for
-  minpeter's machines, from inside another coding agent (pi, codex, senpi, Kiro,
-  Claude Code). Use this whenever a task needs context the current repo does not
-  contain — infrastructure layout, hostnames/ports/routing, why a past decision
-  was made, prior incidents, cross-repo conventions, deploy/ops procedure — and
-  the instinct is to ask the user: run `hermes -z "<query>"` FIRST, then ask the
-  user only about what hermes could not answer. Also use it after making an
-  infra change or a decision with long-lived consequences, to write that fact
-  back into hermes memory (`-t memory`), and to get a second-opinion review of a
-  diff or plan from an agent that has the operational history. Covers the
-  three moves (consult / teach / review), query construction, the fact that a
-  failed run can still look like an answer (`--usage-file` verification), CWD and
-  auto-approved tools, profile-aware memory paths, session hygiene, and what must
-  never be sent to a hosted model.
-  Query templates: references/queries.md. CLI flags, memory layout, and
-  troubleshooting: references/cli.md.
+  Consult the local `hermes` agent as the long-term-memory oracle for minpeter's
+  machines, from inside another coding agent (pi, codex, senpi, Kiro, Claude
+  Code). Use it whenever a task needs context the repo does not contain —
+  infrastructure layout, hostnames/ports/routing, why a past decision was made,
+  prior incidents, cross-repo conventions, deploy/ops procedure — and the
+  instinct is to ask the user: run `hermes -z "<query>"` FIRST, then ask the user
+  only what hermes could not answer. Also use it after an infra change or a
+  long-lived decision, to write that fact back into hermes memory (`-t memory`),
+  and for a second-opinion review of a diff or plan from an agent that has the
+  operational history. Covers query construction, why a failed run can still look
+  like an answer (`--usage-file`), auto-approved tools, and what must never be
+  sent to a hosted model. Query templates: references/queries.md. CLI flags,
+  memory layout, troubleshooting: references/cli.md.
 license: MIT
 metadata:
   author: minpeter

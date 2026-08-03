@@ -1,23 +1,19 @@
 ---
 name: minpeter-skills-maintainer
 description: >-
-  Maintains the minpeter/minpeter-skills repository — the collection of Agent
-  Skills in the open SKILL.md format. Use this when adding a new skill to that
-  repo, editing or refining an existing skill, splitting an oversized SKILL.md
-  into references/, renaming or removing a skill, or fixing drift between
-  SKILL.md frontmatter, README.md's index table, and skills.sh.json groupings.
-  Also use it when the user says "add a skill", "update the skills repo",
-  "write a skill for X", or asks how this repo is laid out. Covers the mandatory
-  workflow (throwaway /tmp clone → branch → PR → reinstall locally after merge;
-  never edit a local checkout in place, never commit to main), scaffolding with
-  `npx skills init`, frontmatter and naming rules, the three files that must stay
-  in sync, progressive disclosure limits, and the pre-commit verification pass.
-  Everything here is published to a PUBLIC repo, so it also enforces the
-  no-secrets / no-PII rule: no tokens, credentials, private hostnames, internal
-  URLs, real emails, or machine-local paths in a skill — use placeholders.
-  Authoring guidance for descriptions and skill bodies is in
-  references/authoring.md; the clone / verify / PR / post-merge-install runbook
-  is in references/maintenance.md.
+  Maintains the minpeter/minpeter-skills repository — minpeter's collection of
+  Agent Skills in the open SKILL.md format. Use this when adding a new skill
+  there, editing or refining one, splitting an oversized SKILL.md into
+  references/, renaming or removing a skill, or fixing drift between SKILL.md
+  frontmatter, README.md's index table, and skills.sh.json groupings. Also use it
+  when the user says "add a skill", "update the skills repo", or "write a skill
+  for X". Covers the mandatory workflow (throwaway /tmp clone → branch → PR →
+  reinstall locally after merge; never edit a checkout in place, never commit to
+  main), `npx skills init`, frontmatter rules including the 1024-char description
+  limit, the three files that must stay in sync, and the pre-commit verification
+  pass. The repo is PUBLIC, so it enforces the no-secrets / no-PII rule: no
+  tokens, credentials, private hostnames, internal URLs, or machine-local paths.
+  Authoring: references/authoring.md. Runbook: references/maintenance.md.
 license: MIT
 metadata:
   author: minpeter
@@ -141,11 +137,25 @@ link, and both break silently.
 ```bash
 # frontmatter parses, name matches dir, and the CLI can enumerate every skill
 npx skills add . --list
+
+# no description exceeds the spec's 1024-char limit (see references/maintenance.md §3b)
+python3 - <<'EOF'
+import re, sys, pathlib
+bad = 0
+for p in sorted(pathlib.Path('skills').glob('*/SKILL.md')):
+    fm = p.read_text().split('---')[1]
+    m = re.search(r'^description: >-\n((?:  .*\n)+)', fm, re.M)
+    n = len(' '.join(l.strip() for l in m.group(1).strip().split('\n')))
+    print(f"{n:5d}  {'OVER' if n > 1024 else 'ok':4}  {p.parent.name}")
+    bad |= n > 1024
+sys.exit(bad)
+EOF
 ```
 
 Then confirm by hand:
 - [ ] `name` == directory name, lowercase-hyphen, `SKILL.md` uppercase
-- [ ] `description` names the triggers, in one YAML block scalar (`>-`)
+- [ ] `description` names the triggers, in one YAML block scalar (`>-`), and is
+      **under 1024 characters** — aim for ≤ 950 so later edits have room
 - [ ] `SKILL.md` under ~500 lines; heavy detail in `references/`
 - [ ] every `references/` file is linked from `SKILL.md`, and every link resolves
 - [ ] README table row present and accurate
@@ -275,6 +285,7 @@ when a reinstall looks like it did nothing:
 Nested skill directories (`skills/a/b/SKILL.md`) · lowercase `skill.md` ·
 `name` that disagrees with the directory · a skill missing from README or
 `skills.sh.json` · descriptions that describe the topic but not the trigger ·
+descriptions over 1024 characters ·
 1000-line `SKILL.md` with no `references/` · pinned tool versions ·
 `references/` files nothing links to · commits pushed straight to `main` ·
 edits made in a long-lived local checkout instead of a fresh `/tmp` clone ·
