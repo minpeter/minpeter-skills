@@ -8,6 +8,11 @@
       "skills": ["typescript-package"]
     },
     {
+      "title": "Agents",
+      "description": "Working with other agents from inside a coding agent.",
+      "skills": ["hermes-agent-consult"]
+    },
+    {
       "title": "Meta",
       "description": "Skills for maintaining this collection itself.",
       "skills": ["minpeter-skills-maintainer"]
