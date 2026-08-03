@@ -105,8 +105,12 @@ the bad case entirely on a case-insensitive filesystem.
 ## 5. Commit, push, and open the PR
 
 ```bash
-# SUBJECT must match KIND (§0): feat(skills): add … | docs(<name>): … | chore(skills): …
-SUBJECT="feat(skills): add $SKILL"
+# Derive the commit subject from KIND (§0) so it cannot contradict the branch.
+case $KIND in
+  skill) SUBJECT="feat(skills): add $SKILL" ;;
+  docs)  SUBJECT="docs($SKILL): <what changed>" ;;
+  chore) SUBJECT="chore(skills): <rename|remove> $SKILL" ;;
+esac
 
 git add skills/$SKILL README.md skills.sh.json AGENTS.md
 git commit -m "$SUBJECT"
@@ -129,12 +133,12 @@ EOF
 )"
 ```
 
-Stage the specific paths rather than `git add .`. Keep the PR title under ~70
-chars. `gh pr create --fill` is fine for small refinements where the commit
-message already says everything. `git push -u origin HEAD` is deliberate: it
-pushes whatever branch is checked out, so it cannot drift from the name created in
-§0 (a removal on `chore/remove-<name>` would fail against a re-derived
-`$KIND/$SKILL`).
+Stage the specific paths rather than `git add .`. Fill in the `<…>` placeholders in
+the `docs`/`chore` subjects before committing. Keep the PR title under ~70 chars.
+`gh pr create --fill` is fine for small refinements where the commit message
+already says everything. `git push -u origin HEAD` is deliberate: it pushes
+whatever branch is checked out, so it cannot drift from the name created in §0 (a
+removal on `chore/remove-<name>` would fail against a re-derived `$KIND/$SKILL`).
 
 **Never** push to `main` and never `git commit` in the user's own checkout of
 this repo.
