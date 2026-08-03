@@ -7,18 +7,14 @@ description: >-
   into references/, renaming or removing a skill, or fixing drift between
   SKILL.md frontmatter, README.md's index table, and skills.sh.json groupings.
   Also use it when the user says "add a skill", "update the skills repo",
-  "write a skill for X", or asks how this repo is laid out. Enforces the
-  mandatory workflow: clone the repo into /tmp/minpeter-skills-<skill-name>, work
-  on a branch there, and open a PR with `gh pr create` — never edit an existing
-  local checkout in place and never commit to main. After the PR is reviewed and
-  merged, reinstall the skill on this machine with `npx skills add -g` (new skill)
-  or `npx skills update -g` (existing skill) so the globally installed copy stops
-  being stale. Also covers the
-  scaffold-with-`npx skills init` rule, frontmatter and naming requirements,
-  the three files that must stay in sync, progressive disclosure limits, and
-  the pre-commit verification pass. Authoring guidance for descriptions and
-  skill bodies is in references/authoring.md; the exact clone / sync / verify /
-  PR / post-merge-install procedure is in references/maintenance.md.
+  "write a skill for X", or asks how this repo is laid out. Covers the mandatory
+  workflow (throwaway /tmp clone → branch → PR → reinstall locally after merge;
+  never edit a local checkout in place, never commit to main), scaffolding with
+  `npx skills init`, frontmatter and naming rules, the three files that must stay
+  in sync, progressive disclosure limits, and the pre-commit verification pass.
+  Authoring guidance for descriptions and skill bodies is in
+  references/authoring.md; the clone / verify / PR / post-merge-install runbook
+  is in references/maintenance.md.
 license: MIT
 metadata:
   author: minpeter
@@ -134,7 +130,9 @@ Then confirm by hand:
 - [ ] `SKILL.md` under ~500 lines; heavy detail in `references/`
 - [ ] every `references/` file is linked from `SKILL.md`, and every link resolves
 - [ ] README table row present and accurate
-- [ ] name present in exactly one `skills.sh.json` grouping
+- [ ] name present in exactly one `skills.sh.json` grouping (check with
+      `jq -r '.groupings[].skills[]' skills.sh.json`, not a bare grep — a plain
+      quoted-string grep also matches the JSON keys)
 - [ ] no absolute paths or machine-local paths anywhere in the skill
 
 Full procedure, including the link-check and drift-check one-liners:
@@ -154,10 +152,11 @@ gh pr merge <n> --squash --delete-branch
 
 ## 5. Install the merged skill on this machine
 
-**A merged PR changes nothing locally.** Installed skills are copies under
-`~/.agents/skills/<name>`, symlinked into each agent's directory, and tracked in
-`~/.agents/.skill-lock.json` by source repo + folder hash. Until you reinstall,
-every agent on this machine keeps reading the pre-merge version.
+**A merged PR changes nothing locally.** The installed copy lives at
+`~/.agents/skills/<name>` (global scope), is tracked in
+`~/.agents/.skill-lock.json` by source repo + folder hash, and is surfaced into
+each detected agent's directory. Until you reinstall, every agent on this machine
+keeps reading the pre-merge version.
 
 ```bash
 # refresh the local checkout of the repo
@@ -174,12 +173,12 @@ npx skills update -g <name>
 for it after adding a brand-new skill is a silent no-op. That distinction is the
 one thing to get right here.
 
-Then confirm the machine actually has the new content:
+Then confirm the machine actually has the new content by reading the installed
+files — not by grepping `skills ls` output, which is colorized for humans:
 
 ```bash
-npx skills ls -g                       # name, install path, agents, source repo
 rg -n '^name:' ~/.agents/skills/<name>/SKILL.md
-ls ~/.agents/skills/<name>/references/ # references/ came along too
+ls ~/.agents/skills/<name>/references/   # references/ came along too
 ```
 
 Finally, clean up the scratch clone: `rm -rf /tmp/minpeter-skills-<name>`.
@@ -189,6 +188,7 @@ Notes:
   install into the current project's agent directory instead.
 - `-a '*'` targets every detected agent. Name specific ones (`-a pi,claude-code`)
   to narrow it.
+- `npx skills ls -g` is the human-readable view of what is installed where.
 - If a skill was **renamed**, install the new name and
   `npx skills remove -g <old-name>` — the old directory and lock entry do not
   disappear on their own, and two copies means ambiguous activation.

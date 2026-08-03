@@ -34,19 +34,25 @@ file is misplaced. This is the closest thing this repo has to a build.
 
 ## 2. Check the three-way sync
 
+Normalize all three sources to bare skill names, then compare:
+
 ```bash
 # names declared in frontmatter
-rg -N '^name:' skills/*/SKILL.md
+rg -N --no-filename '^name:' skills/*/SKILL.md | sed 's/^name:[[:space:]]*//' | sort
 
 # names referenced by the README index table
-rg -o 'skills/[a-z0-9-]+/SKILL\.md' README.md | sort -u
+rg -o 'skills/([a-z0-9-]+)/SKILL\.md' -r '$1' README.md | sort -u
 
 # names listed in the skills.sh groupings
-rg -o '"[a-z0-9-]+"' skills.sh.json
+jq -r '.groupings[].skills[]' skills.sh.json | sort
 ```
 
-All three lists must contain the same set of skill names. Also verify each
-frontmatter `name` equals its directory name:
+All three must print the same set. Use `jq` for the JSON — a bare
+`rg -o '"[a-z0-9-]+"' skills.sh.json` also matches the object keys (`title`,
+`description`, `skills`, `groupings`) and the `notGrouped` value, so the
+comparison silently stops meaning anything.
+
+Also verify each frontmatter `name` equals its directory name:
 
 ```bash
 for d in skills/*/; do
@@ -76,13 +82,20 @@ done
 ```bash
 wc -l skills/*/SKILL.md skills/*/references/*   # SKILL.md under ~500 lines
 
-ls skills/*/skill.md 2>/dev/null                # must be empty: filename is UPPERCASE
-find skills -name SKILL.md -mindepth 3          # must be empty: flat layout only
+# filename must be uppercase SKILL.md; -iname also catches case-insensitive FS
+find skills -iname 'skill.md' ! -name 'SKILL.md'   # must print nothing
+find skills -mindepth 3 -name SKILL.md             # must print nothing: flat layout only
 
-rg -n '/home/|/Users/|C:\\' skills/             # no machine-local paths
-                                                # (this file self-matches; ignore that hit)
-rg -n '@[0-9]+\.[0-9]+\.[0-9]+' skills/         # suspicious pinned versions
+# no machine-local paths, no pinned tool versions.
+# Exclude this skill: it documents both patterns, so it self-matches.
+META="!**/minpeter-skills-maintainer/**"
+rg -n --glob "$META" '/home/|/Users/|C:\\' skills/
+rg -n --glob "$META" '@[0-9]+\.[0-9]+\.[0-9]+' skills/
 ```
+
+`find ... ! -name` is used instead of `ls skills/*/skill.md` because the glob
+exits non-zero when it matches nothing, which trips up `&&` chains, and it misses
+the bad case entirely on a case-insensitive filesystem.
 
 ## 5. Commit, push, and open the PR
 
@@ -125,16 +138,21 @@ gh pr merge <n> --squash --delete-branch
 
 ## 7. Install the merged skill on this machine
 
-A merged PR does not touch the local install. Layout on this machine:
+A merged PR does not touch the local install. Global-scope layout:
 
 ```
-~/.agents/skills/<name>/        # the actual installed copy (global scope)
-~/.pi/agent/skills/<name>       # symlink -> ../../../.agents/skills/<name>
-~/.claude/skills/<name>         # ...one symlink per detected agent
+~/.agents/skills/<name>/        # the actual installed copy
 ~/.agents/.skill-lock.json      # source repo + skillFolderHash per skill
+~/.pi/agent/skills/<name>       # symlink -> ../../../.agents/skills/<name>
+<other agent dirs>/<name>       # one entry per detected agent
 ```
 
-So until you reinstall, every agent keeps reading the pre-merge copy.
+The canonical copy is the one under `~/.agents/skills/`; verify against that.
+How each agent directory points at it varies (symlink, or a copy with `--copy`,
+and some agents' dirs chain through another agent's), so do not assume a
+particular link shape per agent — ask `npx skills ls -g` instead.
+
+Until you reinstall, every agent keeps reading the pre-merge copy.
 
 ```bash
 # 1. refresh the local checkout
@@ -147,14 +165,18 @@ npx skills add -g minpeter/minpeter-skills --skill "$SKILL" -a '*' -y
 # 2b. EXISTING skill — already locked, update in place
 npx skills update -g "$SKILL"
 
-# 3. verify the machine has the merged content
-npx skills ls -g | rg -A1 "$SKILL"
+# 3. verify the machine has the merged content (read the installed files)
 rg -n '^name:' "$HOME/.agents/skills/$SKILL/SKILL.md"
 ls "$HOME/.agents/skills/$SKILL/references/"
+diff -r "$HOME/.agents/skills/$SKILL" "skills/$SKILL" && echo "install matches main"
 
 # 4. drop the scratch clone
 rm -rf "$WORK"
 ```
+
+`npx skills ls -g` is useful for a human eyeball over install paths, agents, and
+source repo, but its output is ANSI-colored and meant for reading — assert
+against the files, as above, rather than grepping it.
 
 `update` iterates over what is already in `.skill-lock.json`. Running it for a
 brand-new skill is a silent no-op that looks like success — use `add` for the
