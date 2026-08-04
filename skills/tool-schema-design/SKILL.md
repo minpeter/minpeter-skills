@@ -10,8 +10,10 @@ description: >-
   FriendliAI, vLLM/SGLang, and more). Covers the canonical-schema + adapter
   architecture, the hard rules (root object, no oneOf/allOf, nested anyOf
   allowed, no $ref/default/constraint keywords in the canonical schema),
-  strict-mode transforms, and tool-design practices beyond the schema
-  (naming, tool count, consolidation, output and error design, evals).
+  strict-mode transforms, the authoring guide for names, descriptions, and
+  errors (what to write, what style, how long), and tool-design practices
+  beyond the schema (naming, tool count, consolidation, output and error
+  design, evals).
 license: MIT
 metadata:
   author: minpeter
@@ -88,6 +90,33 @@ Violating these cannot be repaired by an adapter.
 - **Security**: remote tool metadata is untrusted input (MCP annotations, tool-search results) — allowlist, sanitize, show inputs to users. ToolHijacker (NDSS 2026) reached 96.7% attack success via crafted descriptions.
 - **Maintenance**: generate schemas from Pydantic/Zod as the single source; CI-check type/schema drift; keep wire schemas byte-stable (providers cache compiled grammars); version semantic changes.
 - **Evals**: iterate tool definitions against realistic multi-call tasks with held-out sets and operational metrics (calls, tokens, invalid-argument rate), not just tool-choice unit tests.
+
+## Writing names, descriptions, and errors
+
+Structure gets a schema *accepted*; authoring determines whether the model
+calls it correctly. Full guide with templates:
+[`references/authoring.md`](references/authoring.md). The short version:
+
+- **Name**: self-describing `verb_noun` (`get_user_profile`, never
+  `fetch(id)`); service-prefix when catalogs overlap.
+- **Tool description = a short spec**, in order: what it does → when to use
+  → when NOT to use + the alternative tool → what it returns → caveats.
+  3–4 sentences (Anthropic/Together); more only for complex tools. The
+  "do NOT use for X, use Y" line is the highest-value sentence when tools
+  overlap.
+- **Write for the model, not humans**: no implementation details, no
+  docstring-speak. Apply the intern test — a new engineer given only the
+  schema should call the tool correctly.
+- **Parameter descriptions**: one line = meaning + format/units + example
+  (`"IANA time zone, e.g. America/Los_Angeles"`). Defaults go in prose
+  ("default 500, max 2000"), never the `default` keyword (H7). Keep
+  `required` minimal — models hallucinate values for required params the
+  user never mentioned.
+- **Errors**: never silent. `{success: false, error, retry_hint}` with a
+  small canonical code set (`VALIDATION_ERROR`, `RATE_LIMITED`, …) and a
+  retryable flag. The hint names the concrete fix.
+- **Descriptions are eval-able artifacts**: wording changes change
+  behavior — re-run tool evals after every edit.
 
 ## Operating principles
 
