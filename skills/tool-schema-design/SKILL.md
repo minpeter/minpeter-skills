@@ -47,11 +47,11 @@ Violating these cannot be repaired by an adapter.
 | # | Rule | Why |
 |---|------|-----|
 | H1 | Root is a non-empty `type: "object"`. No root union/enum/const. | MCP, OpenAI strict, Bedrock, Cohere, Kimi, Qwen, xAI all force an object root. Top-level enums only exist in Gemini structured *output* — never tool input. |
-| H2 | Concrete types only: `object`/`string`/`number`/`integer`/`boolean`/`array`; arrays carry one schema-valued `items`. | Universally supported; BFCL grades type errors. |
-| H3 | `description` on the tool and on every non-obvious property (units, constraints, selection criteria). Skip tautologies. | Anthropic: "by far the most important factor in tool performance". OpenAI: "describe … each parameter (and its format)". Descriptions cost tokens and are an attack surface on untrusted tools. |
+| H2 | Concrete types only: `object`/`string`/`number`/`integer`/`boolean`/`array`; arrays carry one schema-valued `items`. | Universally supported; type errors are a graded failure class in tool-calling benchmarks. |
+| H3 | `description` on the tool and on every non-obvious property (units, constraints, selection criteria). Skip tautologies. | Provider guidance calls descriptions the largest factor in tool performance. Descriptions cost tokens and are an attack surface on untrusted tools. |
 | H4 | `oneOf`/`allOf`/`not` forbidden. **Nested `anyOf` is allowed.** | anyOf confirmed on OpenAI strict, Anthropic, xAI, DeepSeek strict, Cohere, current Gemini, Fireworks (full 2020-12), FriendliAI (anyOf *only*), vLLM/SGLang (XGrammar). oneOf/allOf are rejected or undocumented on several of these. Root anyOf stays banned via H1. Avoid even anyOf when targeting undocumented providers (Together, GMI, Groq, GLM/Kimi/Qwen) — split into separate tools or a string discriminator enum. |
 | H5 | No `title`. | Absent from the Firebase vocabulary; costs nothing to skip. |
-| H6 | Limits: nesting ≤ 10, total fields ≤ 200, tools ≤ 20 per request. | OpenAI depth cap 10; Cohere counts an aggregate 200-field budget; Anthropic strict allows 20 tools/request. Accuracy degrades as tool count grows (OpenAI cookbook). |
+| H6 | Limits: nesting ≤ 10, total fields ≤ 200, tools ≤ 20 per request. | OpenAI depth cap 10; Cohere counts an aggregate 200-field budget; Anthropic strict allows 20 tools/request. Accuracy degrades as tool count grows. |
 | H7 | No `$ref`/`$defs`/`default`/`const`/numeric-length constraints/`pattern` in the canonical schema. | An adapter-free schema beats a clever one. Inline repeated structures; put constraints in the description prose and validate server-side. |
 
 ## Soft rules (canonical holds the meaning; adapters transform)
@@ -60,7 +60,7 @@ Violating these cannot be repaired by an adapter.
 |---|------|------------------|
 | S1 | `required` reflects real optionality. Optional fields are fine. | OpenAI/DeepSeek strict: make every property required and encode optional as a nullable union. Everyone else: pass through. |
 | S2 | Closed-object intent. | Inject `additionalProperties: false` recursively for OpenAI/DeepSeek/Bedrock; omit for Gemini/Firebase paths; omit for xAI (already default false). |
-| S3 | Nullability is intent only. | OpenAI: null union / Anthropic: `["T","null"]` / Gemini: `nullable: true` / xAI & loose Anthropic: omit from `required`. Never conflate *missing* with *null*. Note: required+nullable has a recorded runtime failure (Vercel AI SDK #15730) — validate returned arguments. |
+| S3 | Nullability is intent only. | OpenAI: null union / Anthropic: `["T","null"]` / Gemini: `nullable: true` / xAI & loose Anthropic: omit from `required`. Never conflate *missing* with *null*. Note: required+nullable has recorded runtime failures in production SDK paths — validate returned arguments. |
 | S4 | Enums: string-valued on properties; use them for genuinely closed sets. | Legacy Gemini typed `Schema` only allows string enums (`repeated string`); numeric enums need the `parametersJsonSchema` path or string conversion. Under strict decoding enums are masked at token level — the strongest guarantee available. High-cardinality or evolving vocabularies belong in a string + lookup tool instead. |
 | S5 | Use `format` (`date`, `date-time`, `email`, `uuid`, …). | Enforced by OpenAI strict, xAI, DeepSeek (5 formats); ignored but never rejected elsewhere. Never rely on it for validation — re-validate at the application boundary and repeat the semantics in the description ("ISO 8601 with UTC offset"). |
 | S6 | ~~`$ref`/`default`/constraints tolerated~~ — superseded by H7: forbidden in the canonical schema. | Removing the keyword class removes the adapter logic for it entirely. |
@@ -75,7 +75,7 @@ Violating these cannot be repaired by an adapter.
 - **Bedrock**: object root + `additionalProperties: false`; Draft 2020-12 subset only.
 - **Cohere**: ≥ 1 required property per object (disable `strict_tools` for no-arg tools); 200-field aggregate budget; remove oneOf/allOf.
 - **GLM / Kimi / Qwen / Mistral**: no published keyword matrix — send the canonical schema as-is and validate returned arguments client-side. "OpenAI-compatible" describes the wire envelope, not strict behavior.
-- **MCP**: keep the object root; flatten unions into separate tools or a string discriminator — hosts do not reliably consume `oneOf` (modelcontextprotocol#2806).
+- **MCP**: keep the object root; flatten unions into separate tools or a string discriminator — hosts do not reliably consume `oneOf`.
 - **Aggregators (OpenRouter/LiteLLM/Vercel AI SDK)**: pin provider+model+SDK version; validate the post-transform wire schema — these layers have stripped `parameters`, `required`, and `additionalProperties` in production. On OpenRouter set `require_parameters: true`.
 
 ## Beyond the schema (verified practices)
@@ -87,7 +87,7 @@ Violating these cannot be repaired by an adapter.
 - **Examples**: Anthropic `input_examples` (schema-validated, ~20–200 tokens); OpenAI warns examples can hurt reasoning models — put them in instructions instead.
 - **Outputs**: return high-signal data + stable semantic IDs; add a `concise|detailed` detail parameter; paginate/truncate with defaults; on MCP emit `outputSchema` + `structuredContent` + a text mirror.
 - **Errors**: separate protocol errors from execution errors; model-visible errors must say what to fix, never a raw traceback; validate inputs before executing.
-- **Security**: remote tool metadata is untrusted input (MCP annotations, tool-search results) — allowlist, sanitize, show inputs to users. ToolHijacker (NDSS 2026) reached 96.7% attack success via crafted descriptions.
+- **Security**: remote tool metadata is untrusted input (MCP annotations, tool-search results) — allowlist, sanitize, show inputs to users. Crafted descriptions demonstrably hijack tool selection.
 - **Maintenance**: generate schemas from Pydantic/Zod as the single source; CI-check type/schema drift; keep wire schemas byte-stable (providers cache compiled grammars); version semantic changes.
 - **Evals**: iterate tool definitions against realistic multi-call tasks with held-out sets and operational metrics (calls, tokens, invalid-argument rate), not just tool-choice unit tests.
 
@@ -101,7 +101,7 @@ calls it correctly. Full guide with templates:
   `fetch(id)`); service-prefix when catalogs overlap.
 - **Tool description = a short spec**, in order: what it does → when to use
   → when NOT to use + the alternative tool → what it returns → caveats.
-  3–4 sentences (Anthropic/Together); more only for complex tools. The
+  3–4 sentences; more only for complex tools. The
   "do NOT use for X, use Y" line is the highest-value sentence when tools
   overlap.
 - **Write for the model, not humans**: no implementation details, no
@@ -127,8 +127,8 @@ calls it correctly. Full guide with templates:
 ## Not settled (do not guess)
 
 Deeper production knowledge — failure taxonomy, strict-mode costs,
-tool-count pressure, schema–model misalignment (PA-Tool), schema
-compilation (TSCG) — with verification labels:
+tool-count pressure, schema–model misalignment, schema
+compilation — with verification labels:
 [`references/deep-dive.md`](references/deep-dive.md).
 
 GLM/Kimi/Qwen keyword-level acceptance (no public matrix) · xAI tool cap (200 vs 128 docs contradiction) · OpenAI/Anthropic `oneOf` status (undocumented) · schema-size↔accuracy curves (no controlled studies).

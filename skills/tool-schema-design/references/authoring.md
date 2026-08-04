@@ -15,18 +15,18 @@ practices · Schema Design Cheatsheet (awesome-agentic-ai-zh) · Adaline Labs
 - **Self-describing `verb_noun`**: `get_user_profile(user_id)`, never
   `fetch(id)` or `process_data(input)`. The name alone should signal query
   vs mutation vs action.
-- Charset/length: `^[a-zA-Z0-9_-]{1,64}$` (OpenAI∩Anthropic intersection).
-  Together additionally advises against dashes/periods — underscores are the
-  safest denominator.
+- Charset/length: `^[a-zA-Z0-9_-]{1,64}$` (the portable intersection).
+  Some providers additionally advise against dashes/periods — underscores
+  are the safest denominator.
 - Namespace by service/resource: `github_list_prs`, `asana_projects_search`.
-  Prefix vs suffix ordering has non-trivial, model-dependent effects
-  (Anthropic, measured) — pick by eval, keep it consistent.
+  Prefix vs suffix ordering has non-trivial, model-dependent measured
+  effects — pick by eval, keep it consistent.
 
 ## Tool description = a short spec
 
 The description is the only context the model has for *when* to call and
-*how* to fill arguments (Together). Anthropic: "Provide extremely detailed
-descriptions. This is by far the most important factor in tool performance."
+*how* to fill arguments. Provider guidance calls extremely detailed
+descriptions "by far the most important factor in tool performance."
 
 Cover, in order:
 
@@ -42,8 +42,8 @@ Cover, in order:
 5. **Caveats/limits** — what it does NOT do, edge cases: "Does not return
    after-hours quotes."
 
-**Length**: 3–4 sentences for simple tools (Anthropic, Together), more for
-complex ones. Azure OpenAI caps descriptions at 1,024 chars. Every sentence
+**Length**: 3–4 sentences for simple tools, more for
+complex ones. One major provider caps descriptions at 1,024 chars. Every sentence
 costs input tokens on every request — spend them on selection boundaries,
 not on restating the name.
 
@@ -53,15 +53,15 @@ not on restating the name.
   "See API docs"). The model never reads your code.
 - Concrete, declarative sentences. Inline micro-examples help measurably:
   `"Search products by query. Examples: 'laptop under $1000', 'red shoes
-  size 10'."` (Caveat: OpenAI warns examples may hurt reasoning models —
+  size 10'."` (Caveat: reasoning models can perform worse with examples —
   prefer folding them into prose, not rigid templates.)
-- **Intern test** (Together/OpenAI): if a new engineer given only the
+- **Intern test**: if a new engineer given only the
   schema could call the tool correctly, the description is done. Every
   question they would ask is a sentence to add.
-- **Field mirroring** (Adaline): in system prompts and instructions, refer
+- **Field mirroring**: in system prompts and instructions, refer
   to parameters by their exact schema names — it anchors argument filling.
 - Descriptions are eval-able artifacts: wording changes — even punctuation —
-  change behavior (cheatsheet). Re-run your tool evals after every edit.
+  change behavior. Re-run your tool evals after every edit.
 
 ## Parameter descriptions
 
@@ -78,30 +78,30 @@ One line each: **meaning + format/units + example**.
   canonical schema by H7; Gemini ignores it anyway): "Max lines to return
   (default 500, max 2000)."
 - Keep `required` minimal and honest: models hallucinate values for
-  required params the user never mentioned (cheatsheet). If a param has a
+  required params the user never mentioned. If a param has a
   sensible default, make it optional and prose the default.
-- Skip descriptions only on truly self-evident fields (MCP's own spec
-  examples leave `a`/`b` bare) — but when in doubt, write the line.
+- Skip descriptions only on truly self-evident fields (even spec examples
+  leave trivial fields bare) — but when in doubt, write the line.
 
 ## Errors are part of the schema contract
 
 The model reads error output to decide retry / pivot / give up. Design it:
 
 - Never fail silently: success → `{success: true, data: …}`, failure →
-  `{success: false, error: …, retry_hint: …}` (cheatsheet).
-- Use a small canonical error-code set with a retry flag (Adaline):
+  `{success: false, error: …, retry_hint: …}`.
+- Use a small canonical error-code set with a retry flag:
   `VALIDATION_ERROR` (retryable=false, ask for corrected value),
   `RATE_LIMITED` (retryable=true, backoff), `AUTH_SCOPE_DENIED`,
   `UPSTREAM_TIMEOUT` (retryable=true, narrow the request).
 - The `hint`/`retry_hint` text tells the model the concrete fix:
   "Check spelling, or try a major city nearby" — not "Error 500".
 
-## Anti-patterns (from the cheatsheet, reconciled with Anthropic)
+## Anti-patterns
 
 - **God tool**: one tool per *system* (`do_database_op(op, table, data)`)
   mixes wrong op with right table. But do not explode one tool per API
   endpoint either — consolidate one **natural workflow** into one tool with
-  an `action` enum (Anthropic). The unit of splitting is the task, not the
+  an `action` enum. The unit of splitting is the task, not the
   backend surface.
 - **Description as docstring**: "GET /api/v2/weather. Returns JSON."
   teaches nothing about when to call.
