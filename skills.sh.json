@@ -13,6 +13,11 @@
       "skills": ["hermes-agent-consult"]
     },
     {
+      "title": "LLM Tooling",
+      "description": "Designing tool/function-calling schemas that work across providers.",
+      "skills": ["tool-schema-design"]
+    },
+    {
       "title": "Meta",
       "description": "Skills for maintaining this collection itself.",
       "skills": ["minpeter-skills-maintainer"]
