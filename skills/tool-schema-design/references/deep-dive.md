@@ -5,9 +5,9 @@ Beyond-structure knowledge for production tool design. Each item is labeled:
 **[paper]** = a single paper's claim, not independently replicated ·
 **[practice]** = reasoning/convention, no hard measurement.
 
-## 1. Schema–model misalignment (the deepest failure mode)
+## 1. Schema–model misalignment (the deepest failure mode) **[paper]**
 
-**[paper]** PA-Tool (arXiv 2510.07248): small models (4B–14B) most often
+PA-Tool (arXiv 2510.07248): small models (4B–14B) most often
 fail by *inventing tool names* — they drift toward the naming conventions
 seen in pretraining. PA-Tool generates candidate names and picks the one the
 model finds most "familiar" (peakedness over edit-distance clusters),
