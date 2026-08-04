@@ -126,6 +126,11 @@ calls it correctly. Full guide with templates:
 
 ## Not settled (do not guess)
 
+Deeper production knowledge — failure taxonomy, strict-mode costs,
+tool-count pressure, schema–model misalignment (PA-Tool), schema
+compilation (TSCG) — with verification labels:
+[`references/deep-dive.md`](references/deep-dive.md).
+
 GLM/Kimi/Qwen keyword-level acceptance (no public matrix) · xAI tool cap (200 vs 128 docs contradiction) · OpenAI/Anthropic `oneOf` status (undocumented) · schema-size↔accuracy curves (no controlled studies).
 
 Nitpick: zod v4's `z.toJSONSchema()` always emits a root `$schema` key with no opt-out; no provider is known to reject it — ignore unless a rejection is observed.
