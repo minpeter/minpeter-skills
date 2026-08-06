@@ -167,8 +167,18 @@ def main() -> None:
             conformance_records.append(json.loads(block))
         except json.JSONDecodeError:
             continue
-    if not any(record.get("distinction_lost") is True for record in conformance_records):
-        fail("conformance records must encode distinction_lost as a boolean")
+    collapse_records = [
+        record
+        for record in conformance_records
+        if record.get("diagnostic_code") == "OPTIONAL_NULLABLE_STATE_COLLAPSE"
+    ]
+    if not any(
+        record.get("distinction_lost") is True
+        and record.get("wire_fidelity") == "lossy"
+        and record.get("default_action") == "reject"
+        for record in collapse_records
+    ):
+        fail("optional nullable conformance must encode a boolean loss and rejection")
     if not any(
         record.get("diagnostic_code") == "OPTIONAL_NULLABLE_STATE_COLLAPSE"
         and record.get("default_action") == "reject"
@@ -187,13 +197,18 @@ def main() -> None:
         "private IP": r"\b(?:10\.[0-9]+\.[0-9]+\.[0-9]+|127\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)\b",
         "connection string": r"(?i)(?:postgres|mysql|mongodb|redis)://",
     }
+    excluded_public_files = {
+        repo / "skills" / "minpeter-skills-maintainer" / "SKILL.md",
+        repo / "skills" / "minpeter-skills-maintainer" / "references" / "maintenance.md",
+    }
     public_files = [
         *sorted(repo.glob("*.md")),
         groupings,
+        *([repo / "LICENSE"] if (repo / "LICENSE").is_file() else []),
         *sorted(
             path
             for path in (repo / "skills").rglob("*.md")
-            if "minpeter-skills-maintainer" not in path.parts
+            if path not in excluded_public_files
         ),
     ]
     public_text = "\n".join(path.read_text(encoding="utf-8") for path in public_files)

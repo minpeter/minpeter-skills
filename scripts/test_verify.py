@@ -30,6 +30,7 @@ class VerifyScriptTests(unittest.TestCase):
     def copy_repository(self, destination: Path) -> None:
         source = Path(__file__).resolve().parents[1]
         shutil.copy2(source / "README.md", destination / "README.md")
+        shutil.copy2(source / "LICENSE", destination / "LICENSE")
         shutil.copy2(source / "AGENTS.md", destination / "AGENTS.md")
         shutil.copy2(source / "skills.sh.json", destination / "skills.sh.json")
         shutil.copytree(
@@ -131,6 +132,20 @@ class VerifyScriptTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("non-example email", stderr)
 
+    def test_scans_public_license_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            license_file = repository / "LICENSE"
+            license_file.write_text(
+                f"{license_file.read_text(encoding='utf-8')}contact person@private.test\n",
+                encoding="utf-8",
+            )
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual(code, 1)
+        self.assertIn("non-example email", stderr)
+
     def test_scans_non_email_public_patterns(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
@@ -152,14 +167,46 @@ class VerifyScriptTests(unittest.TestCase):
             repository = Path(directory)
             (repository / "skills").mkdir()
             self.copy_repository(repository)
-            maintainer = repository / "skills" / "minpeter-skills-maintainer" / "references"
-            maintainer.mkdir(parents=True)
-            (maintainer / "patterns.md").write_text(
-                "contact dev@private.test; use api.internal\n",
+            maintainer = repository / "skills" / "minpeter-skills-maintainer"
+            maintainer.mkdir()
+            (maintainer / "SKILL.md").write_text(
+                "contact dev@private.test; use api.internal; /Users/[A-Za-z0-9]\n",
                 encoding="utf-8",
             )
             code, _, stderr = self.run_verifier(repository)
         self.assertEqual((code, stderr), (0, ""))
+
+    def test_scans_non_pattern_maintainer_documentation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            maintainer = repository / "skills" / "minpeter-skills-maintainer" / "references"
+            maintainer.mkdir(parents=True)
+            (maintainer / "authoring.md").write_text(
+                "contact dev@private.test\n",
+                encoding="utf-8",
+            )
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual(code, 1)
+        self.assertIn("non-example email", stderr)
+
+    def test_rejects_string_loss_flag_in_c05(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            conformance = repository / "skills" / "tool-schema-design" / "references" / "conformance.md"
+            text = conformance.read_text(encoding="utf-8")
+            text = text.replace(
+                '"wire_fidelity": "lossy",\n  "distinction_lost": true,',
+                '"wire_fidelity": "lossy",\n  "distinction_lost": "true",',
+                1,
+            )
+            conformance.write_text(text, encoding="utf-8")
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual(code, 1)
+        self.assertIn("boolean loss and rejection", stderr)
 
     def test_git_whitespace_uses_fixed_argv_and_timeout(self) -> None:
         completed = type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()
