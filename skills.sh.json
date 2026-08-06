@@ -13,6 +13,11 @@
       "skills": ["hermes-agent-consult"]
     },
     {
+      "title": "Browser Automation",
+      "description": "Capturing reproducible browser evidence from web applications.",
+      "skills": ["capturing-ui-screenshots"]
+    },
+    {
       "title": "LLM Tooling",
       "description": "Designing tool/function-calling schemas that work across providers.",
       "skills": ["tool-schema-design"]
