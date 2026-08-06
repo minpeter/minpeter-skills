@@ -147,6 +147,7 @@ def main() -> None:
     required_concepts = (
         "Semantic source contract",
         "Target profile",
+        "Wire schema compiler",
         '"exact" | "reversible" | "lossy" | "unsupported"',
         "OPTIONAL_NULLABLE_STATE_COLLAPSE",
         "parametersJsonSchema",
@@ -161,8 +162,15 @@ def main() -> None:
     conformance_text = (skill_dir / "references" / "conformance.md").read_text(
         encoding="utf-8"
     )
+    c05_match = re.search(
+        r"^### C05: optional nullable\n(?P<section>.*?)(?=^## |\Z)",
+        conformance_text,
+        re.M | re.S,
+    )
+    if not c05_match:
+        fail("conformance.md must contain the C05 optional nullable case")
     conformance_records = []
-    for block in re.findall(r"```json\n(.*?)\n```", conformance_text, re.S):
+    for block in re.findall(r"```json\n(.*?)\n```", c05_match.group("section"), re.S):
         try:
             conformance_records.append(json.loads(block))
         except json.JSONDecodeError:
@@ -179,12 +187,6 @@ def main() -> None:
         for record in collapse_records
     ):
         fail("optional nullable conformance must encode a boolean loss and rejection")
-    if not any(
-        record.get("diagnostic_code") == "OPTIONAL_NULLABLE_STATE_COLLAPSE"
-        and record.get("default_action") == "reject"
-        for record in conformance_records
-    ):
-        fail("conformance records must cover optional nullable state collapse")
 
     secret_patterns = {
         "GitHub token": r"gh[pousr]_[A-Za-z0-9]{16,}",

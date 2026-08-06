@@ -203,6 +203,14 @@ class VerifyScriptTests(unittest.TestCase):
                 '"wire_fidelity": "lossy",\n  "distinction_lost": "true",',
                 1,
             )
+            text = text.replace(
+                "### C06: nested closed objects",
+                "### C06: nested closed objects\n\n```json\n"
+                '{"wire_fidelity": "lossy", "distinction_lost": true, '
+                '"diagnostic_code": "OPTIONAL_NULLABLE_STATE_COLLAPSE", '
+                '"default_action": "reject"}\n```',
+                1,
+            )
             conformance.write_text(text, encoding="utf-8")
             code, _, stderr = self.run_verifier(repository)
         self.assertEqual(code, 1)
