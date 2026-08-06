@@ -70,16 +70,13 @@ def main() -> None:
     if not frontmatter_match:
         fail("SKILL.md must contain one YAML frontmatter block")
     frontmatter = frontmatter_match.group("frontmatter")
-    if not re.fullmatch(
-        r"name:\s*\S+\n"
-        r"description: >-\n"
-        r"(?:  .*\n)+"
-        r"license:\s*\S+\n"
-        r"metadata:\n"
-        r"  author:\s*\S+",
-        frontmatter,
-    ):
-        fail("SKILL.md frontmatter has an unsupported or malformed shape")
+    top_level_keys = {
+        line.split(":", 1)[0]
+        for line in frontmatter.splitlines()
+        if line and not line.startswith((" ", "\t"))
+    }
+    if not top_level_keys <= {"name", "description", "license", "metadata"}:
+        fail("SKILL.md frontmatter has an unsupported top-level key")
 
     name_match = re.search(r"^name:\s*(\S+)\s*$", frontmatter, re.M)
     if not name_match or name_match.group(1) != skill_dir.name:
@@ -183,7 +180,15 @@ def main() -> None:
         "private IP": r"\b(?:10\.[0-9]+\.[0-9]+\.[0-9]+|127\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)\b",
         "connection string": r"(?i)(?:postgres|mysql|mongodb|redis)://",
     }
-    public_text = "\n".join((readme_text, all_skill_text))
+    public_files = [
+        readme,
+        *sorted(
+            path
+            for path in (repo / "skills").rglob("*.md")
+            if "minpeter-skills-maintainer" not in path.parts
+        ),
+    ]
+    public_text = "\n".join(path.read_text(encoding="utf-8") for path in public_files)
     for label, pattern in secret_patterns.items():
         if re.search(pattern, public_text):
             fail(f"possible {label} in public content")
