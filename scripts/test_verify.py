@@ -30,6 +30,7 @@ class VerifyScriptTests(unittest.TestCase):
     def copy_repository(self, destination: Path) -> None:
         source = Path(__file__).resolve().parents[1]
         shutil.copy2(source / "README.md", destination / "README.md")
+        shutil.copy2(source / "AGENTS.md", destination / "AGENTS.md")
         shutil.copy2(source / "skills.sh.json", destination / "skills.sh.json")
         shutil.copytree(
             source / "skills" / "tool-schema-design",
@@ -94,6 +95,20 @@ class VerifyScriptTests(unittest.TestCase):
             other.mkdir()
             (other / "SKILL.md").write_text(
                 "---\nname: other-skill\ndescription: >-\n  bad person@private.test\n---\n",
+                encoding="utf-8",
+            )
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual(code, 1)
+        self.assertIn("non-example email", stderr)
+
+    def test_scans_top_level_public_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            agents = repository / "AGENTS.md"
+            agents.write_text(
+                f"{agents.read_text(encoding='utf-8')}bad person@private.test\n",
                 encoding="utf-8",
             )
             code, _, stderr = self.run_verifier(repository)

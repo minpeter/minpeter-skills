@@ -181,7 +181,7 @@ def main() -> None:
         "connection string": r"(?i)(?:postgres|mysql|mongodb|redis)://",
     }
     public_files = [
-        readme,
+        *sorted(repo.glob("*.md")),
         *sorted(
             path
             for path in (repo / "skills").rglob("*.md")

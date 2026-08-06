@@ -24,6 +24,28 @@ This file contains documented and example evidence. Add live-test records in the
 project that owns the adapter, because credentials, models, and deployment
 versions are environment-specific.
 
+## Evidence ledger
+
+The labels below attach an evidence level and primary source to each target ID
+used by both matrix tables. A cell that says `unknown` still overrides the
+row-level label; the ledger does not turn an example into a support guarantee.
+
+| Target ID | Evidence | Primary source |
+|---|---|---|
+| `openai.responses.function.strict`, `openai.chat.function.strict` | `documented` | [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) |
+| `anthropic.messages.tool.strict.raw` | `documented` | [Anthropic strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use) |
+| `anthropic.sdk.tool.strict` | `sdk-transform` | [Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) |
+| `gemini.generateContent.function.parameters` | `documented` | [Gemini GenerateContent API](https://ai.google.dev/api/generate-content) |
+| `gemini.generateContent.function.parametersJsonSchema` | `example-only` | [Gemini GenerateContent API](https://ai.google.dev/api/generate-content) |
+| `vertex.v1.function.parameters` | `documented` | [Vertex FunctionDeclaration RPC](https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rpc/google.cloud.aiplatform.v1) |
+| `vertex.v1.function.parametersJsonSchema` | `example-only` | [Vertex FunctionDeclaration RPC](https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rpc/google.cloud.aiplatform.v1) |
+| `deepseek.beta.chat.function.strict` | `documented` | [DeepSeek tool calls](https://api-docs.deepseek.com/guides/tool_calls) |
+| `cohere.v2.chat.strict_tools` | `documented` | [Cohere tool parameter types](https://docs.cohere.com/docs/tool-use-parameter-types) |
+| `bedrock.converse.tool.strict`, `bedrock.invokeModel.claude.tool.strict` | `documented` | [Amazon Bedrock structured outputs](https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html) |
+| `xai.tool.input` | `documented` | [xAI Structured Outputs](https://docs.x.ai/developers/model-capabilities/text/structured-outputs) |
+| `fireworks.chat.function.parameters` | `documented` | [Fireworks tool calling](https://docs.fireworks.ai/guides/function-calling) and [JSON Schema support](https://docs.fireworks.ai/structured-responses/structured-response-formatting) |
+| `mcp.2025-11-25.inputSchema` | `documented` | [MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) |
+
 ## Target identity and core object rules
 
 | Target ID | Surface and mode | Requiredness | Closed objects | Null and optional semantics | No-argument tool |

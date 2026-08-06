@@ -307,7 +307,7 @@ not override system or application policy.
 
 - Every target profile has a unique ID and verification date.
 - Every compile result has diagnostics, even when empty.
-- No `lossy` result with `distinctionLost: true` is emitted without failure.
+- No `lossy` result with `distinction_lost: true` is emitted without failure.
 - Every `reversible` result names and tests its decoder.
 - Every removed keyword appears in diagnostics with its source path.
 - Generated wire schemas are stable fixtures and diffed in review.
