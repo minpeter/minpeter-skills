@@ -1,117 +1,182 @@
-# Authoring Guide — Names, Descriptions, and Errors
+# Authoring Guide: Names, Descriptions, Parameters, Outputs, and Errors
 
-How to write the *content* of a tool schema: what goes in `name`,
-`description`, and parameter descriptions, in what style, and how long.
-Distinct from the structural rules in `SKILL.md` — this is prompt
-engineering for tool selection and argument filling.
-
-Sources: Anthropic "Writing effective tools for agents" + Claude tool-use
-docs · OpenAI function-calling guide · Together AI function-calling best
-practices · Schema Design Cheatsheet (awesome-agentic-ai-zh) · Adaline Labs
-· JSONSchemaBench/IFEval-FC where marked.
+Schema compilation determines whether a provider accepts a tool. Authoring
+determines whether the model selects it, fills it correctly, and recovers after
+failure. Treat names and descriptions as behavior-affecting artifacts and test
+them like code.
 
 ## Names
 
-- **Self-describing `verb_noun`**: `get_user_profile(user_id)`, never
-  `fetch(id)` or `process_data(input)`. The name alone should signal query
-  vs mutation vs action.
-- Charset/length: `^[a-zA-Z0-9_-]{1,64}$` (the portable intersection).
-  Some providers additionally advise against dashes/periods — underscores
-  are the safest denominator.
-- Namespace by service/resource: `github_list_prs`, `asana_projects_search`.
-  Prefix vs suffix ordering has non-trivial, model-dependent measured
-  effects — pick by eval, keep it consistent.
+Use a self-describing action and resource:
 
-## Tool description = a short spec
+- `get_user_profile`, not `fetch`
+- `github_list_pull_requests`, not `process_data`
+- `calendar_find_availability`, not `find`
 
-The description is the only context the model has for *when* to call and
-*how* to fill arguments. Provider guidance calls extremely detailed
-descriptions "by far the most important factor in tool performance."
+House rules:
 
-Cover, in order:
+- Prefer `^[a-zA-Z0-9_-]{1,64}$` unless every target profile permits more.
+- Prefer underscores when targeting providers that discourage punctuation.
+- Namespace by service when catalogs overlap.
+- Keep a deployed name stable. A semantic behavior change gets a new tool name
+  or versioned contract.
+- Evaluate prefix and suffix variants instead of assuming one naming order wins
+  across models.
 
-1. **What it does** — one line, present tense: "Get current weather for a
-   specified city."
-2. **When to use** — trigger situations/phrases: "Use this when the user
-   asks about current weather, temperature, or 'is it raining'."
-3. **When NOT to use + the alternative**: "Do NOT use for forecasts (use
-   `get_forecast` instead) or historical data." This disambiguation line is
-   the highest-value sentence in the whole schema when tools overlap.
-4. **What it returns** — units and shape: "Returns temperature in C/F,
-   humidity, and conditions." The model uses the result for the next step.
-5. **Caveats/limits** — what it does NOT do, edge cases: "Does not return
-   after-hours quotes."
+## Tool description as a selection contract
 
-**Length**: 3–4 sentences for simple tools, more for
-complex ones. One major provider caps descriptions at 1,024 chars. Every sentence
-costs input tokens on every request — spend them on selection boundaries,
-not on restating the name.
+Write the description in this order:
 
-**Style / grammar**:
-- Write **for the model, not for humans**. No implementation details
-  ("Uses OpenWeather API v2.5"), no docstring-speak ("Returns JSON",
-  "See API docs"). The model never reads your code.
-- Concrete, declarative sentences. Inline micro-examples help measurably:
-  `"Search products by query. Examples: 'laptop under $1000', 'red shoes
-  size 10'."` (Caveat: reasoning models can perform worse with examples —
-  prefer folding them into prose, not rigid templates.)
-- **Intern test**: if a new engineer given only the
-  schema could call the tool correctly, the description is done. Every
-  question they would ask is a sentence to add.
-- **Field mirroring**: in system prompts and instructions, refer
-  to parameters by their exact schema names — it anchors argument filling.
-- Descriptions are eval-able artifacts: wording changes — even punctuation —
-  change behavior. Re-run your tool evals after every edit.
+1. **What it does**: one concrete sentence.
+2. **When to use it**: user intents and triggering situations.
+3. **When not to use it, plus the alternative**: the boundary against adjacent
+   tools.
+4. **What it returns**: the data and identifiers the model can use next.
+5. **Material caveats**: scope, freshness, permissions, or side effects.
+
+Example:
+
+```text
+Search saved contacts by name, email, company, or domain. Use this before
+sending email or creating a calendar invitation when the recipient is not
+already resolved to an address. Do not use it to search the public web; use the
+web-search tool instead. Returns stable contact identifiers and available email
+addresses. Results may be incomplete when directory access is restricted.
+```
+
+The highest-value sentence for overlapping tools is usually the explicit
+"do not use for X; use Y" boundary.
+
+### Length and style
+
+- Simple tools usually need three or four information-dense sentences.
+- Stay within the smallest description limit of the selected targets.
+- Write for the model that must choose and call the tool, not for the engineer
+  reading implementation details.
+- Exclude backend trivia such as HTTP methods, library versions, or internal
+  endpoint names unless that fact changes correct use.
+- Use declarative prose. Avoid vague words such as "process", "handle", or
+  "data" when a concrete verb and object exist.
+- Include a micro-example only when it disambiguates format or intent.
+- Re-run evaluations after punctuation and wording edits; description changes
+  can change selection behavior.
 
 ## Parameter descriptions
 
-One line each: **meaning + format/units + example**.
+One line should communicate meaning, representation, units, and one example when
+useful:
 
+```text
+"symbol": "Exchange ticker symbol, for example AAPL."
+"window_start": "Inclusive ISO 8601 timestamp with UTC offset, for example 2026-08-05T09:00:00+09:00."
+"organizer_tz": "IANA time zone, for example Asia/Seoul."
+"radius_m": "Search radius in metres, greater than 0."
 ```
-"symbol":  "The stock ticker symbol, e.g. AAPL for Apple Inc."
-"window_start": "ISO 8601 start of search window, e.g. 2026-08-04T09:00:00Z"
-"organizer_tz": "IANA time zone of the organizer, e.g. America/Los_Angeles"
-"unit":    "Temperature unit."   (enum already constrains the values)
+
+Rules:
+
+- Mirror exact schema field names in system instructions and examples.
+- Keep `required` semantically honest. Do not require a value merely because a
+  strict target requires all wire properties; that is an adapter concern.
+- Record application defaults in the source contract. Whether `default` is sent
+  on the wire is a target decision, and JSON Schema defaults are generally
+  annotations rather than automatic value insertion.
+- Put units and time-zone expectations in both the source validator and the
+  description.
+- Use enums only for genuinely closed and stable sets. High-cardinality or
+  evolving vocabularies belong in a lookup tool or validated string.
+- Do not describe tautological fields such as two mathematical operands named
+  `a` and `b` unless additional meaning exists.
+
+## Requiredness and nullability in prose
+
+Descriptions do not repair an incorrect schema. Use prose only to clarify the
+business meaning after the source contract distinguishes:
+
+- omitted: the caller did not supply the field
+- explicit null: the caller supplied "no value"
+- value: the caller supplied a concrete value
+
+Never tell a model that null means omitted unless the adapter also declares the
+null-sentinel decoder and the source field is non-nullable.
+
+## Outputs
+
+A good tool result gives the model enough information for the next step without
+returning an unbounded dump.
+
+- Return stable semantic IDs next to human-readable labels.
+- Return units, time zones, and freshness timestamps where they affect meaning.
+- Paginate or truncate large results and report that truncation explicitly.
+- Offer a `concise` versus `detailed` mode only when the distinction is stable
+  and useful.
+- For MCP, use `outputSchema` and `structuredContent` when clients benefit from
+  typed output; provide the required text representation for compatibility.
+- Do not expose secrets, raw database records, internal stack traces, or fields
+  the model does not need.
+
+## Errors are part of the contract
+
+Separate two classes:
+
+1. **Protocol or schema errors**: malformed request envelope, unknown tool, or
+   invalid wire schema. These are integration defects.
+2. **Execution errors**: invalid business value, missing authorization, upstream
+   failure, rate limit, or timeout. These can often guide model recovery.
+
+A model-visible execution error should be structured and actionable:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "window_start must be earlier than window_end.",
+    "retryable": true,
+    "retry_hint": "Swap the timestamps or ask the user for a corrected range."
+  }
+}
 ```
 
-- State defaults **in prose**, not the `default` keyword (banned from the
-  canonical schema by H7; Gemini ignores it anyway): "Max lines to return
-  (default 500, max 2000)."
-- Keep `required` minimal and honest: models hallucinate values for
-  required params the user never mentioned. If a param has a
-  sensible default, make it optional and prose the default.
-- Skip descriptions only on truly self-evident fields (even spec examples
-  leave trivial fields bare) — but when in doubt, write the line.
+Use a small stable code set, for example:
 
-## Errors are part of the schema contract
+- `VALIDATION_ERROR`
+- `NOT_FOUND`
+- `AUTH_SCOPE_DENIED`
+- `RATE_LIMITED`
+- `CONFLICT`
+- `UPSTREAM_TIMEOUT`
+- `UPSTREAM_UNAVAILABLE`
 
-The model reads error output to decide retry / pivot / give up. Design it:
-
-- Never fail silently: success → `{success: true, data: …}`, failure →
-  `{success: false, error: …, retry_hint: …}`.
-- Use a small canonical error-code set with a retry flag:
-  `VALIDATION_ERROR` (retryable=false, ask for corrected value),
-  `RATE_LIMITED` (retryable=true, backoff), `AUTH_SCOPE_DENIED`,
-  `UPSTREAM_TIMEOUT` (retryable=true, narrow the request).
-- The `hint`/`retry_hint` text tells the model the concrete fix:
-  "Check spelling, or try a major city nearby" — not "Error 500".
+`retryable` means an automated retry can be safe after following the hint. It
+must not be set merely because the model could try again. Mutating tools also
+need idempotency protection.
 
 ## Anti-patterns
 
-- **God tool**: one tool per *system* (`do_database_op(op, table, data)`)
-  mixes wrong op with right table. But do not explode one tool per API
-  endpoint either — consolidate one **natural workflow** into one tool with
-  an `action` enum. The unit of splitting is the task, not the
-  backend surface.
-- **Description as docstring**: "GET /api/v2/weather. Returns JSON."
-  teaches nothing about when to call.
-- **Everything is a string**: `"count: "five"`, `"active: "yes"` — use
-  integer/boolean/array types (H2).
-- **Silent failure**: returning `null`/`{}` on error makes the model
-  fabricate from empty data.
+- **God tool**: `do_database_op(action, table, data)` spans unrelated tasks and
+  lets the model combine the right operation with the wrong resource.
+- **Endpoint explosion**: one tool per backend endpoint makes selection harder.
+  Split and consolidate by natural user workflow, not by service internals.
+- **Description as docstring**: "GET /api/v2/weather. Returns JSON." does not
+  teach selection or argument filling.
+- **Everything is a string**: `"count": "five"` and `"active": "yes"` should
+  use integer and boolean types.
+- **Silent failure**: returning `null` or `{}` on error invites fabrication.
+- **Required-by-wire leakage**: changing a semantically optional source field to
+  required only because one provider's strict mode requires it.
+- **Description-only validation**: stating "must be positive" without retaining
+  the constraint in the source validator.
+- **Raw traceback**: reveals internals and gives the model no stable recovery
+  instruction.
 
 ## Schema evolution
 
-- Additive change → new **optional** param, never a new required one.
-- Meaning change → new tool name (`get_weather_v2`), deprecate then remove.
-- Any description edit → re-run the tool evals before shipping.
+- Additive compatible change: add an optional source field.
+- New required source field: version the contract or provide an application
+  migration; do not silently break existing callers.
+- Meaning change: create a new tool name or explicit version.
+- Adapter change: re-run every target conformance case and compare diagnostics.
+- Description change: re-run tool-selection and argument-filling evaluations.
+- Model, API, or SDK change: invalidate prior compatibility evidence until the
+  target profile is tested again.
