@@ -144,20 +144,20 @@ def main() -> None:
         for number, line in enumerate(raw.splitlines(), 1):
             if line.rstrip() != line:
                 fail(f"trailing whitespace in {display_path(path, repo)}:{number}")
-    required_concepts = (
-        "Semantic source contract",
-        "Target profile",
-        "Wire schema compiler",
-        '"exact" | "reversible" | "lossy" | "unsupported"',
-        "OPTIONAL_NULLABLE_STATE_COLLAPSE",
-        "parametersJsonSchema",
-        "no-argument",
-        "runtime validator",
-        "distinction_lost",
+    required_anchors = (
+        r"\*\*Semantic source contract\*\*:",
+        r"\*\*Target profile\*\*:",
+        r"\*\*Wire schema compiler\*\*:",
+        r"\*\*Runtime validator\*\*:",
+        r'"exact"\s*\|\s*"reversible"\s*\|\s*"lossy"\s*\|\s*"unsupported"',
+        r"OPTIONAL_NULLABLE_STATE_COLLAPSE",
+        r"\bparametersJsonSchema\b",
+        r"\bno-argument\b",
+        r"\bdistinction_lost\b",
     )
-    for phrase in required_concepts:
-        if phrase not in all_skill_text:
-            fail(f"required architecture concept missing: {phrase}")
+    for anchor in required_anchors:
+        if not re.search(anchor, all_skill_text):
+            fail(f"required architecture anchor missing: {anchor}")
 
     conformance_text = (skill_dir / "references" / "conformance.md").read_text(
         encoding="utf-8"
