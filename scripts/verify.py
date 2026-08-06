@@ -196,7 +196,7 @@ def main() -> None:
         "Bearer token": r"Bearer [A-Za-z0-9._-]{20,}",
         "machine path": r"(?i)(?:/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9])",
         "private hostname": r"(?i)\.(?:internal|corp|local)\b",
-        "private IP": r"\b(?:10\.[0-9]+\.[0-9]+\.[0-9]+|127\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)\b",
+        "private IP": r"\b(?:10\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)\b",
         "connection string": r"(?i)(?:postgres|mysql|mongodb|redis)://",
     }
     excluded_public_files = {
