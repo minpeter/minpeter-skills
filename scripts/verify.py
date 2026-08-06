@@ -144,24 +144,53 @@ def main() -> None:
         for number, line in enumerate(raw.splitlines(), 1):
             if line.rstrip() != line:
                 fail(f"trailing whitespace in {display_path(path, repo)}:{number}")
-    required_anchors = (
-        r"\*\*Semantic source contract\*\*:",
-        r"\*\*Target profile\*\*:",
-        r"\*\*Wire schema compiler\*\*:",
-        r"\*\*Runtime validator\*\*:",
-        r'"exact"\s*\|\s*"reversible"\s*\|\s*"lossy"\s*\|\s*"unsupported"',
-        r"OPTIONAL_NULLABLE_STATE_COLLAPSE",
-        r"\bparametersJsonSchema\b",
-        r"\bno-argument\b",
-        r"\bdistinction_lost\b",
+    architecture = re.search(
+        r"^Use four layers:\n(?P<section>.*?)(?=^```)", text, re.M | re.S
     )
-    for anchor in required_anchors:
-        if not re.search(anchor, all_skill_text):
-            fail(f"required architecture anchor missing: {anchor}")
+    if not architecture:
+        fail("SKILL.md must define the four-layer architecture")
+    layer_anchors = (
+        r"1\. \*\*Semantic source contract\*\*:",
+        r"2\. \*\*Target profile\*\*:",
+        r"3\. \*\*Wire schema compiler\*\*:",
+        r"4\. \*\*Runtime validator\*\*:",
+    )
+    for anchor in layer_anchors:
+        if not re.search(anchor, architecture.group("section")):
+            fail(f"required architecture layer missing: {anchor}")
+
+    compiler = re.search(
+        r"^## Compiler contract\n(?P<section>.*?)(?=^## |\Z)", text, re.M | re.S
+    )
+    if not compiler:
+        fail("SKILL.md must define a compiler contract")
+    compiler_section = compiler.group("section")
+    if not re.search(
+        r'type Fidelity = "exact"\s*\|\s*"reversible"\s*\|\s*"lossy"\s*\|\s*"unsupported"',
+        compiler_section,
+    ):
+        fail("compiler contract must define all four fidelity values")
+    if not re.search(r"\bdistinction_lost:\s*boolean\b", compiler_section):
+        fail("compiler contract must define distinction_lost")
+
+    invariants = re.search(
+        r"^## Non-negotiable invariants\n(?P<section>.*?)(?=^## |\Z)",
+        text,
+        re.M | re.S,
+    )
+    if not invariants:
+        fail("SKILL.md must define non-negotiable invariants")
+    invariant_section = invariants.group("section")
+    if not re.search(r"Gemini parametersJsonSchema", invariant_section):
+        fail("invariants must separate Gemini parametersJsonSchema")
+    if not re.search(r"genuine no-argument tool uses an empty object", invariant_section):
+        fail("invariants must define no-argument tools")
 
     conformance_text = (skill_dir / "references" / "conformance.md").read_text(
         encoding="utf-8"
     )
+    if not re.search(r"^### C01: no argument\n", conformance_text, re.M):
+        fail("conformance.md must define C01 no-argument behavior")
     c05_match = re.search(
         r"^### C05: optional nullable\n(?P<section>.*?)(?=^## |\Z)",
         conformance_text,
@@ -202,17 +231,18 @@ def main() -> None:
     excluded_public_files = {
         repo / "skills" / "minpeter-skills-maintainer" / "SKILL.md",
         repo / "skills" / "minpeter-skills-maintainer" / "references" / "maintenance.md",
+        repo / "scripts" / "verify.py",
+        repo / "scripts" / "test_verify.py",
     }
-    public_files = [
-        *sorted(repo.glob("*.md")),
-        groupings,
-        *([repo / "LICENSE"] if (repo / "LICENSE").is_file() else []),
-        *sorted(
-            path
-            for path in (repo / "skills").rglob("*.md")
-            if path not in excluded_public_files
-        ),
-    ]
+    public_files = []
+    for path in sorted(repo.rglob("*")):
+        if not path.is_file() or ".git" in path.parts or path in excluded_public_files:
+            continue
+        try:
+            path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        public_files.append(path)
     public_text = "\n".join(path.read_text(encoding="utf-8") for path in public_files)
     for label, pattern in secret_patterns.items():
         if re.search(pattern, public_text):
