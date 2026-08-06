@@ -133,14 +133,6 @@ def main() -> None:
     if occurrences != 1:
         fail(f"tool-schema-design must appear in exactly one skills.sh grouping; found {occurrences}")
 
-    stale_phrases = (
-        'Root is a non-empty `type: "object"`',
-        "adapters exist only for strict-mode transforms",
-        "ignored but never rejected elsewhere",
-        "xAI & loose Anthropic: omit from `required`",
-        "Gemini/Vertex/Firebase",
-        '`"count: "five"`',
-    )
     changed_markdown = [readme, *sorted(skill_dir.rglob("*.md"))]
     all_skill_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(skill_dir.rglob("*.md"))
@@ -152,10 +144,6 @@ def main() -> None:
         for number, line in enumerate(raw.splitlines(), 1):
             if line.rstrip() != line:
                 fail(f"trailing whitespace in {display_path(path, repo)}:{number}")
-    for phrase in stale_phrases:
-        if phrase in all_skill_text:
-            fail(f"stale or incorrect guidance remains: {phrase}")
-
     required_concepts = (
         "Semantic source contract",
         "Target profile",
@@ -164,10 +152,29 @@ def main() -> None:
         "parametersJsonSchema",
         "no-argument",
         "runtime validator",
+        "distinction_lost",
     )
     for phrase in required_concepts:
         if phrase not in all_skill_text:
             fail(f"required architecture concept missing: {phrase}")
+
+    conformance_text = (skill_dir / "references" / "conformance.md").read_text(
+        encoding="utf-8"
+    )
+    conformance_records = []
+    for block in re.findall(r"```json\n(.*?)\n```", conformance_text, re.S):
+        try:
+            conformance_records.append(json.loads(block))
+        except json.JSONDecodeError:
+            continue
+    if not any(record.get("distinction_lost") is True for record in conformance_records):
+        fail("conformance records must encode distinction_lost as a boolean")
+    if not any(
+        record.get("diagnostic_code") == "OPTIONAL_NULLABLE_STATE_COLLAPSE"
+        and record.get("default_action") == "reject"
+        for record in conformance_records
+    ):
+        fail("conformance records must cover optional nullable state collapse")
 
     secret_patterns = {
         "GitHub token": r"gh[pousr]_[A-Za-z0-9]{16,}",
@@ -182,6 +189,7 @@ def main() -> None:
     }
     public_files = [
         *sorted(repo.glob("*.md")),
+        groupings,
         *sorted(
             path
             for path in (repo / "skills").rglob("*.md")

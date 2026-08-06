@@ -115,6 +115,62 @@ class VerifyScriptTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("non-example email", stderr)
 
+    def test_scans_public_groupings_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            groupings = repository / "skills.sh.json"
+            groupings.write_text(
+                groupings.read_text(encoding="utf-8").replace(
+                    "{", '{"contact": "person@private.test",', 1
+                ),
+                encoding="utf-8",
+            )
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual(code, 1)
+        self.assertIn("non-example email", stderr)
+
+    def test_scans_non_email_public_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            other = repository / "skills" / "other-skill"
+            other.mkdir()
+            (other / "SKILL.md").write_text(
+                "---\nname: other-skill\ndescription: >-\n"
+                "  api.internal 10.0.0.1 postgres://db ghp_" + "A" * 20 + "\n---\n",
+                encoding="utf-8",
+            )
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual(code, 1)
+        self.assertIn("GitHub token", stderr)
+
+    def test_ignores_maintainer_pattern_documentation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            (repository / "skills").mkdir()
+            self.copy_repository(repository)
+            maintainer = repository / "skills" / "minpeter-skills-maintainer" / "references"
+            maintainer.mkdir(parents=True)
+            (maintainer / "patterns.md").write_text(
+                "contact dev@private.test; use api.internal\n",
+                encoding="utf-8",
+            )
+            code, _, stderr = self.run_verifier(repository)
+        self.assertEqual((code, stderr), (0, ""))
+
+    def test_git_whitespace_uses_fixed_argv_and_timeout(self) -> None:
+        completed = type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        with patch("verify.subprocess.run", return_value=completed) as run:
+            verify.verify_git_whitespace(Path("/repo"))
+        self.assertEqual(run.call_count, 2)
+        first_args, first_kwargs = run.call_args_list[0]
+        self.assertEqual(first_args[0][:3], ["git", "-C", "/repo"])
+        self.assertEqual(first_kwargs["timeout"], 30)
+        self.assertFalse(first_kwargs["check"])
+
 
 if __name__ == "__main__":
     unittest.main()
