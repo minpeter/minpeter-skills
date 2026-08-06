@@ -106,7 +106,7 @@ type Diagnostic = {
   code: string;
   fidelity: Fidelity;
   enforcement: Enforcement;
-  distinctionLost: boolean;
+  distinction_lost: boolean;
   message: string;
   action: string;
 };
