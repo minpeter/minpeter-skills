@@ -27,14 +27,25 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def display_path(path: Path, repo: Path) -> str:
+    try:
+        return str(path.relative_to(repo))
+    except ValueError:
+        return path.name
+
+
 def verify_git_whitespace(repo: Path) -> None:
     for args in (("diff", "--check"), ("diff", "--cached", "--check")):
-        result = subprocess.run(
-            ["git", "-C", str(repo), *args],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repo), *args],
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            fail(f"git {' '.join(args)} timed out")
         if result.returncode:
             print(result.stdout, end="")
             print(result.stderr, end="", file=sys.stderr)
@@ -42,6 +53,8 @@ def verify_git_whitespace(repo: Path) -> None:
 
 
 def main() -> None:
+    if len(sys.argv) > 2:
+        fail("usage: verify.py [repository]")
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
     skill_dir = repo / "skills" / "tool-schema-design"
     skill = skill_dir / "SKILL.md"
@@ -50,13 +63,23 @@ def main() -> None:
 
     for path in (skill, readme, groupings):
         if not path.is_file():
-            fail(f"missing required file: {path}")
+            fail(f"missing required file: {display_path(path, repo)}")
 
     text = skill.read_text(encoding="utf-8")
-    parts = text.split("---", 2)
-    if len(parts) != 3:
+    frontmatter_match = re.match(r"\A---\n(?P<frontmatter>.*?)\n---\n", text, re.S)
+    if not frontmatter_match:
         fail("SKILL.md must contain one YAML frontmatter block")
-    frontmatter = parts[1]
+    frontmatter = frontmatter_match.group("frontmatter")
+    if not re.fullmatch(
+        r"name:\s*\S+\n"
+        r"description: >-\n"
+        r"(?:  .*\n)+"
+        r"license:\s*\S+\n"
+        r"metadata:\n"
+        r"  author:\s*\S+",
+        frontmatter,
+    ):
+        fail("SKILL.md frontmatter has an unsupported or malformed shape")
 
     name_match = re.search(r"^name:\s*(\S+)\s*$", frontmatter, re.M)
     if not name_match or name_match.group(1) != skill_dir.name:
@@ -89,10 +112,10 @@ def main() -> None:
     for path in sorted((skill_dir / "references").glob("*.md")):
         ref_text = path.read_text(encoding="utf-8")
         if ref_text.count("```") % 2:
-            fail(f"unbalanced fenced code blocks in {path}")
+            fail(f"unbalanced fenced code blocks in {display_path(path, repo)}")
         for target in re.findall(r"\]\((?!https?://|#)([^)#]+\.md)\)", ref_text):
             if not (path.parent / target).resolve().is_file():
-                fail(f"broken relative link in {path}: {target}")
+                fail(f"broken relative link in {display_path(path, repo)}: {target}")
 
     if text.count("```") % 2:
         fail("unbalanced fenced code blocks in SKILL.md")
@@ -128,10 +151,10 @@ def main() -> None:
     for path in changed_markdown:
         raw = path.read_text(encoding="utf-8")
         if not raw.endswith("\n"):
-            fail(f"file must end with a newline: {path}")
+            fail(f"file must end with a newline: {display_path(path, repo)}")
         for number, line in enumerate(raw.splitlines(), 1):
             if line.rstrip() != line:
-                fail(f"trailing whitespace in {path}:{number}")
+                fail(f"trailing whitespace in {display_path(path, repo)}:{number}")
     for phrase in stale_phrases:
         if phrase in all_skill_text:
             fail(f"stale or incorrect guidance remains: {phrase}")
@@ -156,10 +179,17 @@ def main() -> None:
         "private key": r"-----BEGIN [A-Z ]*PRIVATE KEY",
         "Bearer token": r"Bearer [A-Za-z0-9._-]{20,}",
         "machine path": r"(?i)(?:/home/[A-Za-z0-9]|/Users/[A-Za-z0-9]|C:\\Users\\[A-Za-z0-9])",
+        "private hostname": r"(?i)\.(?:internal|corp|local)\b",
+        "private IP": r"\b(?:10\.[0-9]+\.[0-9]+\.[0-9]+|127\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.[0-9]+\.[0-9]+|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]+\.[0-9]+)\b",
+        "connection string": r"(?i)(?:postgres|mysql|mongodb|redis)://",
     }
+    public_text = "\n".join((readme_text, all_skill_text))
     for label, pattern in secret_patterns.items():
-        if re.search(pattern, all_skill_text):
-            fail(f"possible {label} in public skill content")
+        if re.search(pattern, public_text):
+            fail(f"possible {label} in public content")
+    for email in re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", public_text):
+        if not email.lower().endswith(("@example.com", "@example.org")):
+            fail("possible non-example email in public content")
 
     if (repo / ".git").exists():
         verify_git_whitespace(repo)
